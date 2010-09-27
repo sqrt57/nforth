@@ -62,6 +62,25 @@ swap:                           ; x1 x2 -- x2 x1
         jmp next
 
         align   4
+drop:                           ; x --
+        dd      drop+4
+        pop edx                 ; Get new TOS
+        jmp next
+
+        align   4
+dup:                            ; x -- x x
+        dd      dup+4
+        push edx                ; Push a copy of TOS on the stack
+        jmp next
+
+        align   4
+over:                           ; x1 x2 -- x1 x2 x1
+        dd      over+4
+        push edx
+        mov edx, [esp+4]
+        jmp next
+
+        align   4
 get:                            ; addr -- x
         dd      get+4           ; Code field
         mov edx, [edx]          ; Get X from ADDR
@@ -135,7 +154,7 @@ get_str:                        ; -- addr u
 init:                           ; --
         dd      enter, hello, cell1, put, cell2, put, exit
 main:
-        dd      enter, init, get_str, get_str, print, print, sys_exit
+        dd      enter, init, get_str, over, over, print, print, sys_exit
 start_ip:
         dd      main
 
