@@ -38,10 +38,14 @@ enter:
         jmp next                ; Jump to interpreter
 
 exit:
+        dd      exit+4          ; Code field
+        mov eax, [ebp]          ; Pop IP from return stack
+        add ebp, 4              ; Remove cell fromreturn stack
+        jmp next                ; Jump to interpreter
 
         align   4
-print_xt:
-        dd      print_xt+4      ; Code field
+print:
+        dd      print+4         ; Code field
         mov esi, eax            ; Save IP
         mov eax, 4              ; sys_write
         mov ebx, 1              ; Standard output
@@ -52,19 +56,23 @@ print_xt:
         jmp next                ; End of code
 
         align   4
-sys_exit_xt:
-        dd      sys_exit_xt+4   ; Code field
+sys_exit:
+        dd      sys_exit+4      ; Code field
         mov eax, 1              ; sys_exit
         mov ebx, 0              ; Return code 0 - success
         int 80h                 ; Make syscall
 
         align   4
-main_xt:
+print_wrapper:
+        dd      enter, print, exit
+
+        align   4
+main:
         dd      enter           ; Code field
-        dd      print_xt, sys_exit_xt
+        dd      print_wrapper, sys_exit
 
 start_ip:
-        dd      main_xt
+        dd      main
 
 _start:
         nop                     ; Makes gdb happy
