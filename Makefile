@@ -1,13 +1,11 @@
 tutforth : tutforth.o
+	ld -o tutforth tutforth.o
 
-%.o : %.asm
-	nasm -f elf -g -F stabs $< -o $@
+tutforth.o : tutforth.asm
+	nasm -f elf -g -F stabs tutforth.asm -o tutforth.o -l tutforth.lst
 
 clean :
 	rm *.o
-
-% : %.o
-	ld -o $@ $^
 
 .PHONY : clean
 
