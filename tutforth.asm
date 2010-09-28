@@ -1,7 +1,17 @@
 section .data
-        hello_str       db      "Hello, world!",10
-        hello_str_len   equ     $-hello_str
-        hello_str_ptr   dd      hello_str
+        align   4
+cell_pair:
+        dd      dovar, 0, 0, 0
+hello_addr:
+        dd      dovar, 0
+.begin: db "Hello, world!",10
+.end:
+        align   4
+hello_len:
+        dd      doconst, 0, hello_addr.end-hello_addr.begin
+here:
+        dd      doconst, 0, dictionary
+
 section .bss
         alignb  4
 dictionary:
@@ -36,18 +46,32 @@ _start:
 
         jmp next                ; Jump to interpreter
 
+        align   4
 next:
         mov eax, [esi]          ; Get next word address from thread
         lea esi, [esi+4]        ; Adjust IP
         mov edi, [eax]          ; X now points to machine code of next word
         jmp edi                 ; Jump to word machine code
 
+        align   4
 enter:
         lea ebp, [ebp-4]        ; Add one cell on top of return stack
         mov [ebp], esi          ; Push IP on return stack
-        lea esi, [eax+4]        ; Set IP to the parameter field
+        lea esi, [eax+8]        ; Set IP to the parameter field
                                 ; of current word
         jmp next                ; Jump to interpreter
+
+        align   4
+dovar:
+        push edx                ; Push old TOS
+        lea edx, [eax+8]        ; Get adress of parameter field
+        jmp next
+
+        align   4
+doconst:
+        push edx                ; Push old TOS
+        mov edx, [eax+8]        ; Load TOS from parameter field
+        jmp next
 
         align   4
 exit:                           ; --
@@ -92,6 +116,20 @@ put:                            ; x addr --
         dd      put+4           ; Code field
         pop ebx                 ; Get X value
         mov [edx], ebx          ; Store X at ADDR
+        pop edx                 ; Get new TOS
+        jmp next                ; Jump to interpreter
+
+        align   4
+get_char:                       ; addr -- c
+        dd      get_char+4      ; Code field
+        movzx edx, byte [edx]   ; Get C from ADDR
+        jmp next                ; Jump to interpreter
+
+        align   4
+put_char:                       ; c addr --
+        dd      put_char+4      ; Code field
+        pop ebx                 ; Get C value
+        mov byte [edx], bl      ; Store C at ADDR
         pop edx                 ; Get new TOS
         jmp next                ; Jump to interpreter
 
@@ -143,19 +181,19 @@ add:                            ; n1 n2 -- n
         jmp next                ; Jump to interpreter
 
         align   4
-hello:                          ; -- addr u
-        dd      hello+4
-        push edx
-        push hello_str
-        mov edx, hello_str_len
-        jmp next
+sub:                            ; n1 n2 -- n
+        dd      sub+4
+        pop ebx                 ; Get N1 from the stack
+        sub ebx, edx            ; Subtract TOS=N2 from N1
+        mov edx, ebx            ; Move result to TOS
+        jmp next                ; Jump to interpreter
 
         align   4
-dict:                           ; -- addr
-        dd      dict+4
-        push edx                ; Store old TOS
-        mov edx, dictionary     ; Get ADDR of dictionary
-        jmp next                ; Jump to interpreter
+here_add:                       ; n --
+        dd      here_add+4
+        add [here+8], edx       ; Add TOS to HERE value
+        pop edx                 ; Fetch new TOS
+        jmp next
 
         align   4
 print:                          ; addr u --
@@ -176,21 +214,37 @@ sys_exit:                       ; --
         int 80h                 ; Make syscall
 
         align   4
-cycle:
-        dd      enter, lit, -40
+hello:                          ; -- addr u
+        dd      enter, 0, hello_addr, hello_len, exit
+store_char:                     ; addr --
+        dd      enter, 0, get_char, here, put_char, exit
+one_char:                       ; addr -- addr
+        dd      enter, 0, dup, store_char
+        dd      lit, 1, here_add
+        dd      lit, 1, add, exit
+                                ; addr -- addr
+store:                          ; addr u -- addr
+        dd      enter, 0, swap, over            ; u addr u
 .iter:
-        dd      get_str, print, lit, 4, add, dup, zero_eq,
+        dd      dup, jump_if_not, .end, lit, 1, sub
+        dd      swap, one_char, swap
+        dd      jump, .iter
+.end:
+        dd      drop, drop, here, swap, sub, exit
+cycle:
+        dd      enter, 0, lit, -20
+.iter:  dd      get_str, print, lit, 4, add, dup, zero_eq
         dd      jump_if_not, .iter, exit
 cell1:                          ; -- addr
-        dd      enter, dict, exit
+        dd      enter, 0, cell_pair, exit
 cell2:                          ; -- addr
-        dd      enter, dict, lit, 4, add, exit
+        dd      enter, 0, cell_pair, lit, 4, add, exit
 get_str:                        ; -- addr u
-        dd      enter, cell2, get, cell1, get, exit
+        dd      enter, 0, cell2, get, cell1, get, exit
 init:                           ; --
-        dd      enter, hello, cell1, put, cell2, put, exit
+        dd      enter, 0, hello, dup, cell1, put, store, cell2, put, exit
 main:
-        dd      enter, init, cycle, sys_exit
+        dd      enter, 0, init, cycle, sys_exit
 start_ip:
         dd      main
 
