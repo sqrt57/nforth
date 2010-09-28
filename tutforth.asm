@@ -95,12 +95,30 @@ put:                            ; x addr --
         jmp next                ; Jump to interpreter
 
         align   4
-lit:                            ; -- x
+lit:                            ; -- x / x from thread
         dd      lit+4
         push edx                ; Store old TOS
         lodsd                   ; Get X from thread and adjust IP
         mov edx, eax            ; Store X in TOS
         jmp next                ; Jump to interpreter
+
+        align   4
+jump:                           ; -- / addr from thread
+        dd      jump+4
+        mov esi, [esi]          ; Get new IP
+        jmp next
+
+        align   4
+jump_if:                        ; b -- / addr from thread
+        dd      jump_if+4
+        mov ecx, edx            ; Move B from TOS to ECX for testing
+        pop edx                 ; get new TOS
+        add esi, 4              ; If we don't take a jump we must skip
+                                ; jump address in the thread
+        jecxz .continue         ; If B=0 we skip updating IP
+        mov esi, [esi-4]        ; Get new IP (if TOS!=0)
+.continue:
+        jmp next
 
         align   4
 add:                            ; n1 n2 -- n
@@ -143,6 +161,12 @@ sys_exit:                       ; --
         int 80h                 ; Make syscall
 
         align   4
+cycle:
+        dd      enter, lit, -40
+.iter:
+        dd      get_str, print, lit, 4, add, dup, jump_if, .cont, exit
+.cont:
+        dd      jump, .iter
 cell1:                          ; -- addr
         dd      enter, dict, exit
 cell2:                          ; -- addr
@@ -152,7 +176,7 @@ get_str:                        ; -- addr u
 init:                           ; --
         dd      enter, hello, cell1, put, cell2, put, exit
 main:
-        dd      enter, init, get_str, over, over, print, print, sys_exit
+        dd      enter, init, cycle, sys_exit
 start_ip:
         dd      main
 
