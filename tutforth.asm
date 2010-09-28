@@ -28,6 +28,7 @@ section .text
 _start:
         nop                     ; Makes gdb happy
 
+        cld
         mov esi, start_ip       ; Initialize IP
         mov ebp, rstack_bottom  ; Initialize RSP
         mov esp, pstack_bottom  ; Initialize PSP
@@ -36,13 +37,13 @@ _start:
         jmp next                ; Jump to interpreter
 
 next:
-        lodsd                   ; Load next cell from thread
-                                ; and adjust IP
+        mov eax, [esi]          ; Get next word address from thread
+        lea esi, [esi+4]        ; Adjust IP
         mov edi, [eax]          ; X now points to machine code of next word
         jmp edi                 ; Jump to word machine code
 
 enter:
-        sub ebp, 4              ; Add one cell on top of return stack
+        lea ebp, [ebp-4]        ; Add one cell on top of return stack
         mov [ebp], esi          ; Push IP on return stack
         lea esi, [eax+4]        ; Set IP to the parameter field
                                 ; of current word
@@ -52,7 +53,7 @@ enter:
 exit:                           ; --
         dd      exit+4          ; Code field
         mov esi, [ebp]          ; Pop IP from return stack
-        add ebp, 4              ; Remove cell from return stack
+        lea ebp, [ebp+4]        ; Remove cell from return stack
         jmp next                ; Jump to interpreter
 
         align   4
@@ -109,15 +110,29 @@ jump:                           ; -- / addr from thread
         jmp next
 
         align   4
-jump_if:                        ; b -- / addr from thread
-        dd      jump_if+4
-        mov ecx, edx            ; Move B from TOS to ECX for testing
-        pop edx                 ; get new TOS
-        add esi, 4              ; If we don't take a jump we must skip
+jump_if_not:                    ; b -- / addr from thread
+        ; Jumps if TOS=0 (false)
+        dd      jump_if_not+4
+        lea esi, [esi+4]        ; If we don't take a jump we must skip
                                 ; jump address in the thread
-        jecxz .continue         ; If B=0 we skip updating IP
-        mov esi, [esi-4]        ; Get new IP (if TOS!=0)
+        xor eax, eax            ; Zero EAX
+        cmp edx, eax            ; Compare TOS to 0
+        jnz .continue           ; If B!=0 we skip updating IP
+        mov esi, [esi-4]        ; Get new IP (if TOS=0)
 .continue:
+        pop edx                 ; get new TOS
+        jmp next
+
+        align   4
+zero_eq:                        ; b -- b
+        dd      zero_eq+4
+        xor eax, eax            ; Zero EAX
+        cmp edx, eax            ; Compare TOS to 0
+        jnz .continue           ; If TOS!=0 then EAX=0 is what we need,
+                                ; so we skip decrement
+        dec eax                 ; EAX is now -1
+.continue:
+        mov edx, eax            ; Store EAX value to TOS
         jmp next
 
         align   4
@@ -164,9 +179,8 @@ sys_exit:                       ; --
 cycle:
         dd      enter, lit, -40
 .iter:
-        dd      get_str, print, lit, 4, add, dup, jump_if, .cont, exit
-.cont:
-        dd      jump, .iter
+        dd      get_str, print, lit, 4, add, dup, zero_eq,
+        dd      jump_if_not, .iter, exit
 cell1:                          ; -- addr
         dd      enter, dict, exit
 cell2:                          ; -- addr
