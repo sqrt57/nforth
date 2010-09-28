@@ -16,11 +16,11 @@ section .text
 ; This forth is implemented as indirect threaded code.
 ; Register allocation:
 ; 
-; EAX: (IP) instruction pointer
-; EBX: (W) working register - need not be preserved in code words
+; EAX: (W) working register - need not be preserved in code words
+; EBX: -
 ; ECX: -
 ; EDX: (TOS) top of parameter stack
-; ESI: -
+; ESI: (IP) instruction pointer
 ; EDI: -
 ; EBP: (RSP) return stack pointer
 ; ESP: (PSP) parameter stack pointer
@@ -28,7 +28,7 @@ section .text
 _start:
         nop                     ; Makes gdb happy
 
-        mov eax, start_ip       ; Initialize IP
+        mov esi, start_ip       ; Initialize IP
         mov ebp, rstack_bottom  ; Initialize RSP
         mov esp, pstack_bottom  ; Initialize PSP
         mov edx, 0              ; Initialize TOS
@@ -36,22 +36,22 @@ _start:
         jmp next                ; Jump to interpreter
 
 next:
-        mov ebx, [eax]          ; W now points to code field of next word
-        add eax, 4              ; Adjust IP to next word in thread
-        mov esi, [ebx]          ; X now points to machine code of next word
-        jmp esi                 ; Jump to word machine code
+        lodsd                   ; Load next cell from thread
+                                ; and adjust IP
+        mov edi, [eax]          ; X now points to machine code of next word
+        jmp edi                 ; Jump to word machine code
 
 enter:
         sub ebp, 4              ; Add one cell on top of return stack
-        mov [ebp], eax          ; Push IP on return stack
-        lea eax, [ebx+4]        ; Set IP to the parameter field
+        mov [ebp], esi          ; Push IP on return stack
+        lea esi, [eax+4]        ; Set IP to the parameter field
                                 ; of current word
         jmp next                ; Jump to interpreter
 
         align   4
 exit:                           ; --
         dd      exit+4          ; Code field
-        mov eax, [ebp]          ; Pop IP from return stack
+        mov esi, [ebp]          ; Pop IP from return stack
         add ebp, 4              ; Remove cell from return stack
         jmp next                ; Jump to interpreter
 
@@ -98,8 +98,8 @@ put:                            ; x addr --
 lit:                            ; -- x
         dd      lit+4
         push edx                ; Store old TOS
-        mov edx, [eax]          ; Get X from thread
-        add eax, 4              ; Adjust IP
+        lodsd                   ; Get X from thread and adjust IP
+        mov edx, eax            ; Store X in TOS
         jmp next                ; Jump to interpreter
 
         align   4
@@ -127,13 +127,11 @@ dict:                           ; -- addr
         align   4
 print:                          ; addr u --
         dd      print+4         ; Code field
-        mov esi, eax            ; Save IP
-                                ; String length is already in edx
+                                ; String length is already in edx (TOS)
         mov eax, 4              ; sys_write
         mov ebx, 1              ; Standard output
         pop ecx                 ; Address of string
         int 80h                 ; Make syscall
-        mov eax, esi            ; Restore IP
         pop edx                 ; Get new TOS
         jmp next                ; End of code
 
