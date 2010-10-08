@@ -1,27 +1,3 @@
-section .data
-        align   4
-cell_pair:
-        dd      dovar, 0, 0, 0
-hello_addr:
-        dd      dovar, 0
-.begin: db "Hello, world!",10
-.end:
-        align   4
-hello_len:
-        dd      doconst, 0, hello_addr.end-hello_addr.begin
-here:
-        dd      doconst, 0, dictionary
-
-section .bss
-        alignb  4
-dictionary:
-        resd    64
-pstack_bottom:
-        resd    32
-rstack_bottom:
-section .text
-        global _start
-
 ;--------------------------------
 ; This forth is implemented as indirect threaded code.
 ; Register allocation:
@@ -34,6 +10,51 @@ section .text
 ; EDI: -
 ; EBP: (RSP) return stack pointer
 ; ESP: (PSP) parameter stack pointer
+;
+;--------------------------------
+; Dictionary entry structure:
+; 00 +-------------------------
+;    | Address of next word
+; 04 +-------------------------
+;    | 
+; 
+
+        tiblen     equ     128
+
+section .data
+        align   4
+cell_pair:
+        dd      dovar, 0, 0, 0
+hello_addr:
+        dd      dovar, 0
+.begin: db "Hello, world!",10
+.end:
+        align   4
+hello_len:
+        dd      doconst, 0, hello_addr.end-hello_addr.begin
+here:
+        dd      doval, 0, dict_addr
+t_i_b:
+        dd      doconst, 0, tib_addr
+number_t_i_b:
+        dd      dovar, 0, 0
+to_in:
+        dd      dovar, 0, 0
+t_i_b_max:
+        dd      doconst, 0, tiblen
+
+section .bss
+        alignb  4
+dict_addr:
+        resd    1024
+pstack_bottom:
+tib_addr:
+        resb    tiblen
+        alignb  4
+        resd    32
+rstack_bottom:
+section .text
+        global _start
 
 _start:
         nop                     ; Makes gdb happy
@@ -73,6 +94,8 @@ doconst:
         mov edx, [eax+8]        ; Load TOS from parameter field
         jmp next
 
+doval   equ     doconst
+
         align   4
 exit:                           ; --
         dd      exit+4          ; Code field
@@ -106,28 +129,37 @@ over:                           ; x1 x2 -- x1 x2 x1
         jmp next
 
         align   4
-get:                            ; addr -- x
-        dd      get+4           ; Code field
+to_val:                         ; x -- / Gets value address from thread
+        dd      to_val+4
+        mov eax, [esi]          ; Get address of next word
+        mov [eax+8], edx        ; Store TOS inparameter field of next word
+        lea esi, [esi+4]        ; Adjust IP
+        pop edx                 ; Fetch new TOS
+        jmp next
+
+        align   4
+fetch:                          ; addr -- x
+        dd      fetch+4         ; Code field
         mov edx, [edx]          ; Get X from ADDR
         jmp next                ; Jump to interpreter
 
         align   4
-put:                            ; x addr --
-        dd      put+4           ; Code field
+store:                          ; x addr --
+        dd      store+4         ; Code field
         pop ebx                 ; Get X value
         mov [edx], ebx          ; Store X at ADDR
         pop edx                 ; Get new TOS
         jmp next                ; Jump to interpreter
 
         align   4
-get_char:                       ; addr -- c
-        dd      get_char+4      ; Code field
+c_fetch:                        ; addr -- c
+        dd      c_fetch+4       ; Code field
         movzx edx, byte [edx]   ; Get C from ADDR
         jmp next                ; Jump to interpreter
 
         align   4
-put_char:                       ; c addr --
-        dd      put_char+4      ; Code field
+c_store:                        ; c addr --
+        dd      c_store+4       ; Code field
         pop ebx                 ; Get C value
         mov byte [edx], bl      ; Store C at ADDR
         pop edx                 ; Get new TOS
@@ -162,8 +194,8 @@ jump_if_not:                    ; b -- / addr from thread
         jmp next
 
         align   4
-zero_eq:                        ; b -- b
-        dd      zero_eq+4
+zero_equals:                        ; b -- b
+        dd      zero_equals+4
         xor eax, eax            ; Zero EAX
         cmp edx, eax            ; Compare TOS to 0
         jnz .continue           ; If TOS!=0 then EAX=0 is what we need,
@@ -174,26 +206,19 @@ zero_eq:                        ; b -- b
         jmp next
 
         align   4
-add:                            ; n1 n2 -- n
-        dd      add+4
+plus:                           ; n1 n2 -- n
+        dd      plus+4
         pop ebx                 ; Get N1 from the stack
         add edx, ebx            ; Add N1 to TOS=N2
         jmp next                ; Jump to interpreter
 
         align   4
-sub:                            ; n1 n2 -- n
-        dd      sub+4
+minus:                          ; n1 n2 -- n
+        dd      minus+4
         pop ebx                 ; Get N1 from the stack
         sub ebx, edx            ; Subtract TOS=N2 from N1
         mov edx, ebx            ; Move result to TOS
         jmp next                ; Jump to interpreter
-
-        align   4
-here_add:                       ; n --
-        dd      here_add+4
-        add [here+8], edx       ; Add TOS to HERE value
-        pop edx                 ; Fetch new TOS
-        jmp next
 
         align   4
 print:                          ; addr u --
@@ -207,6 +232,18 @@ print:                          ; addr u --
         jmp next                ; End of code
 
         align   4
+read:                           ; addr u -- u
+        dd      read+4
+        mov eax, 4              ; sys_read
+        mov ebx, 0              ; Standard input
+        pop ecx                 ; Pop ADDR of buffer from pstack
+                                ; Number of bytes to read is already
+                                ; in EDX=TOS
+        int 80h                 ; Make syscall
+        pop edx                 ; Get new TOS
+        jmp next
+
+        align   4
 sys_exit:                       ; --
         dd      sys_exit+4      ; Code field
         mov eax, 1              ; sys_exit
@@ -217,32 +254,33 @@ sys_exit:                       ; --
 hello:                          ; -- addr u
         dd      enter, 0, hello_addr, hello_len, exit
 store_char:                     ; addr --
-        dd      enter, 0, get_char, here, put_char, exit
+        dd      enter, 0, c_fetch, here, c_store, exit
 one_char:                       ; addr -- addr
         dd      enter, 0, dup, store_char
-        dd      lit, 1, here_add
-        dd      lit, 1, add, exit
+        dd      here, lit, 1, plus, to_val, here
+        dd      lit, 1, plus, exit
                                 ; addr -- addr
-store:                          ; addr u -- addr
+store_str:                      ; addr u -- addr
         dd      enter, 0, swap, over            ; u addr u
 .iter:
-        dd      dup, jump_if_not, .end, lit, 1, sub
+        dd      dup, jump_if_not, .end, lit, 1, minus
         dd      swap, one_char, swap
         dd      jump, .iter
 .end:
-        dd      drop, drop, here, swap, sub, exit
+        dd      drop, drop, here, swap, minus, exit
 cycle:
         dd      enter, 0, lit, -20
-.iter:  dd      get_str, print, lit, 4, add, dup, zero_eq
+.iter:  dd      get_str, print, lit, 4, plus, dup, zero_equals
         dd      jump_if_not, .iter, exit
 cell1:                          ; -- addr
         dd      enter, 0, cell_pair, exit
 cell2:                          ; -- addr
-        dd      enter, 0, cell_pair, lit, 4, add, exit
+        dd      enter, 0, cell_pair, lit, 4, plus, exit
 get_str:                        ; -- addr u
-        dd      enter, 0, cell2, get, cell1, get, exit
+        dd      enter, 0, cell2, fetch, cell1, fetch, exit
 init:                           ; --
-        dd      enter, 0, hello, dup, cell1, put, store, cell2, put, exit
+        dd      enter, 0, hello, dup, cell1, store, store_str,
+        dd      cell2, store, exit
 main:
         dd      enter, 0, init, cycle, sys_exit
 start_ip:
