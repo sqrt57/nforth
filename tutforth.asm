@@ -19,19 +19,10 @@
 ;    | 
 ; 
 
-        tiblen     equ     128
+        tiblen     equ     1024
 
 section .data
         align   4
-cell_pair:
-        dd      dovar, 0, 0, 0
-hello_addr:
-        dd      dovar, 0
-.begin: db "Hello, world!",10
-.end:
-        align   4
-hello_len:
-        dd      doconst, 0, hello_addr.end-hello_addr.begin
 here:
         dd      doval, 0, dict_addr
 t_i_b:
@@ -42,6 +33,20 @@ to_in:
         dd      dovar, 0, 0
 t_i_b_max:
         dd      doconst, 0, tiblen
+true_addr:
+        dd      doconst, 0, true_str_data
+true_len:
+        dd      doconst, 0, true_str_data.end-true_str_data
+false_addr:
+        dd      doconst, 0, false_str_data
+false_len:
+        dd      doconst, 0, false_str_data.end-false_str_data
+true_str_data:
+        db      "True",10
+.end:
+false_str_data:
+        db      "False",10
+.end:
 
 section .bss
         alignb  4
@@ -129,6 +134,13 @@ over:                           ; x1 x2 -- x1 x2 x1
         jmp next
 
         align   4
+rot:                            ; x1 x2 x3 -- x2 x3 x1
+        dd      rot+4
+        xchg edx, [esp]         ; x1 x3 x2
+        xchg edx, [esp+4]       ; x2 x3 x1
+        jmp next
+
+        align   4
 to_val:                         ; x -- / Gets value address from thread
         dd      to_val+4
         mov eax, [esi]          ; Get address of next word
@@ -169,8 +181,8 @@ c_store:                        ; c addr --
 lit:                            ; -- x / x from thread
         dd      lit+4
         push edx                ; Store old TOS
-        lodsd                   ; Get X from thread and adjust IP
-        mov edx, eax            ; Store X in TOS
+        mov edx, [esi]          ; Read X from thread into TOS
+        lea esi, [esi+4]        ; Adjust IP
         jmp next                ; Jump to interpreter
 
         align   4
@@ -194,7 +206,21 @@ jump_if_not:                    ; b -- / addr from thread
         jmp next
 
         align   4
-zero_equals:                        ; b -- b
+and:                            ; u1 u2 -- u
+        dd      and+4           ; bit-and
+        and edx, [esp]          ; TOS <- U1 and U2
+        lea esp, [esp+4]        ; Remove u1 from stack
+        jmp next
+
+        align   4
+or:                             ; u1 u2 -- u
+        dd      or+4            ; bit-or
+        or edx, [esp]           ; TOS <- U1 or U2
+        lea esp, [esp+4]        ; Remove u1 from stack
+        jmp next
+
+        align   4
+zero_equals:                    ; b -- b
         dd      zero_equals+4
         xor eax, eax            ; Zero EAX
         cmp edx, eax            ; Compare TOS to 0
@@ -203,6 +229,66 @@ zero_equals:                        ; b -- b
         dec eax                 ; EAX is now -1
 .continue:
         mov edx, eax            ; Store EAX value to TOS
+        jmp next
+
+        align   4
+equals:                         ; n/u1 n/u2 -- b
+        dd      equals+4
+        xor eax, eax            ; Zero EAX
+        cmp [esp], edx          ; Compare N1 to TOS=N2
+        jne .continue           ; If not N1=N2 then skip
+        dec eax                 ; If N1=N2 set EAX to TRUE
+.continue:
+        lea esp, [esp+4]        ; Remove n1 from parameter stack
+        mov edx, eax            ; Store result in TOS
+        jmp next
+
+        align   4
+less_than:                      ; n1 n2 -- b
+        dd      less_than+4
+        xor eax, eax            ; Zero EAX
+        cmp [esp], edx          ; Compare N1 to TOS=N2
+        jnl .continue           ; If not N1<N2 then skip
+        dec eax                 ; If N1<N2 set EAX to TRUE
+.continue:
+        lea esp, [esp+4]        ; Remove n1 from parameter stack
+        mov edx, eax            ; Store result in TOS
+        jmp next
+
+        align   4
+greater_than:                   ; n1 n2 -- b
+        dd      greater_than+4
+        xor eax, eax            ; Zero EAX
+        cmp [esp], edx          ; Compare N1 to TOS=N2
+        jng .continue           ; If not N1>N2 then skip
+        dec eax                 ; If N1>N2 set EAX to TRUE
+.continue:
+        lea esp, [esp+4]        ; Remove n1 from parameter stack
+        mov edx, eax            ; Store result in TOS
+        jmp next
+
+        align   4
+less_or_equal:                  ; n1 n2 -- b
+        dd      less_or_equal+4
+        xor eax, eax            ; Zero EAX
+        cmp [esp], edx          ; Compare N1 to TOS=N2
+        jnle .continue          ; If not N1<=N2 then skip
+        dec eax                 ; If N1<=N2 set EAX to TRUE
+.continue:
+        lea esp, [esp+4]        ; Remove n1 from parameter stack
+        mov edx, eax            ; Store result in TOS
+        jmp next
+
+        align   4
+greater_or_equal:               ; n1 n2 -- b
+        dd      greater_or_equal+4
+        xor eax, eax            ; Zero EAX
+        cmp [esp], edx          ; Compare N1 to TOS=N2
+        jnge .continue          ; If not N1>=N2 then skip
+        dec eax                 ; If N1>=N2 set EAX to TRUE
+.continue:
+        lea esp, [esp+4]        ; Remove n1 from parameter stack
+        mov edx, eax            ; Store result in TOS
         jmp next
 
         align   4
@@ -221,8 +307,8 @@ minus:                          ; n1 n2 -- n
         jmp next                ; Jump to interpreter
 
         align   4
-print:                          ; addr u --
-        dd      print+4         ; Code field
+sys_print:                      ; addr u --
+        dd      sys_print+4     ; Code field
                                 ; String length is already in edx (TOS)
         mov eax, 4              ; sys_write
         mov ebx, 1              ; Standard output
@@ -232,15 +318,15 @@ print:                          ; addr u --
         jmp next                ; End of code
 
         align   4
-read:                           ; addr u -- u
-        dd      read+4
-        mov eax, 4              ; sys_read
+sys_read:                       ; addr u -- u
+        dd      sys_read+4
+        mov eax, 3              ; sys_read
         mov ebx, 0              ; Standard input
         pop ecx                 ; Pop ADDR of buffer from pstack
                                 ; Number of bytes to read is already
                                 ; in EDX=TOS
         int 80h                 ; Make syscall
-        pop edx                 ; Get new TOS
+        mov edx, eax            ; Get new TOS
         jmp next
 
         align   4
@@ -251,38 +337,58 @@ sys_exit:                       ; --
         int 80h                 ; Make syscall
 
         align   4
-hello:                          ; -- addr u
-        dd      enter, 0, hello_addr, hello_len, exit
-store_char:                     ; addr --
-        dd      enter, 0, c_fetch, here, c_store, exit
-one_char:                       ; addr -- addr
-        dd      enter, 0, dup, store_char
-        dd      here, lit, 1, plus, to_val, here
-        dd      lit, 1, plus, exit
-                                ; addr -- addr
-store_str:                      ; addr u -- addr
-        dd      enter, 0, swap, over            ; u addr u
-.iter:
-        dd      dup, jump_if_not, .end, lit, 1, minus
-        dd      swap, one_char, swap
-        dd      jump, .iter
-.end:
-        dd      drop, drop, here, swap, minus, exit
-cycle:
-        dd      enter, 0, lit, -20
-.iter:  dd      get_str, print, lit, 4, plus, dup, zero_equals
-        dd      jump_if_not, .iter, exit
-cell1:                          ; -- addr
-        dd      enter, 0, cell_pair, exit
-cell2:                          ; -- addr
-        dd      enter, 0, cell_pair, lit, 4, plus, exit
-get_str:                        ; -- addr u
-        dd      enter, 0, cell2, fetch, cell1, fetch, exit
-init:                           ; --
-        dd      enter, 0, hello, dup, cell1, store, store_str,
-        dd      cell2, store, exit
+true_str:                       ; -- addr u
+        dd      enter, 0, true_addr, true_len, exit
+false_str:                      ; -- addr u
+        dd      enter, 0, false_addr, false_len, exit
+point_bool:                     ; b --
+        ; Prints boolean parameter as "True" or "False"
+        dd      enter, 0, jump_if_not, .else, true_str, sys_print, exit
+.else:
+        dd      false_str, sys_print, exit
+fill_t_i_b:                     ; --
+        dd      enter, 0, t_i_b, t_i_b_max, sys_read
+        dd      number_t_i_b, store, lit, 0, to_in, store, exit
+within:                         ; n1 n2 n3 -- b
+        ; Returns true iff n2 <= n1 < n3, comparison is signed
+        dd      enter, 0, rot, swap, over, greater_than,
+        dd      rot, rot, less_or_equal, and, exit
+plus_store:                     ; u/n addr --
+        dd      enter, 0, dup, fetch, rot, plus, swap, store, exit
+white_q:                        ; c -- b
+        ; We consider 09-0d, 20 as whitespace
+        ; (horizontal tab, line feed, vertical tab, form feed,
+        ;  carriage return, space)
+        dd      enter, 0, dup, lit, 09h, lit, 0eh, within
+        dd      swap, lit, 20h, equals, or, exit
+inside_t_i_b:                   ; -- b
+        dd      enter, 0, to_in, fetch, number_t_i_b, fetch, less_than,
+        dd      exit
+drop_white:                     ; --
+        ; Adjusts >IN to the first non-whitespace character
+        dd      enter, 0
+.iter:  dd      t_i_b, to_in, fetch, plus, c_fetch, white_q,
+        dd      jump_if_not, .end,
+        dd      inside_t_i_b, jump_if_not, .end,
+        dd      lit, 1, to_in, plus_store, jump, .iter
+.end:   dd      exit
+get_word:                       ; -- addr u
+        ; Reads a word from TIB starting at >IN
+        ; Skips leading whitespace
+        ; If end of TIB is reached returns length 0
+        dd      enter, 0, drop_white, t_i_b, to_in, fetch, plus
+        dd      to_in, fetch
+.iter:  dd      t_i_b, to_in, fetch, plus, c_fetch, white_q, zero_equals
+        dd      jump_if_not, .end
+        dd      inside_t_i_b, jump_if_not, .end,
+        dd      lit, 1, to_in, plus_store, jump, .iter
+.end:   dd      to_in, fetch, swap, minus, exit
+test_tib:
+        dd      enter, 0, fill_t_i_b, drop_white
+        dd      t_i_b, to_in, fetch, plus, number_t_i_b, fetch
+        dd      sys_print, t_i_b, c_fetch, white_q, point_bool, sys_exit
 main:
-        dd      enter, 0, init, cycle, sys_exit
+        dd      enter, 0, fill_t_i_b, get_word, sys_print, sys_exit
 start_ip:
         dd      main
 
