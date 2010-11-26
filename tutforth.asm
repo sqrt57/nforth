@@ -41,11 +41,18 @@ false_addr:
         dd      doconst, 0, false_str_data
 false_len:
         dd      doconst, 0, false_str_data.end-false_str_data
+prompt_addr:
+        dd      doconst, 0, prompt_str_data
+prompt_len:
+        dd      doconst, 0, prompt_str_data.end-prompt_str_data
 true_str_data:
         db      "True",10
 .end:
 false_str_data:
         db      "False",10
+.end:
+prompt_str_data:
+        db      " Ok",10
 .end:
 
 section .bss
@@ -341,6 +348,8 @@ true_str:                       ; -- addr u
         dd      enter, 0, true_addr, true_len, exit
 false_str:                      ; -- addr u
         dd      enter, 0, false_addr, false_len, exit
+prompt_str:                      ; -- addr u
+        dd      enter, 0, prompt_addr, prompt_len, exit
 point_bool:                     ; b --
         ; Prints boolean parameter as "True" or "False"
         dd      enter, 0, jump_if_not, .else, true_str, sys_print, exit
@@ -387,8 +396,14 @@ test_tib:
         dd      enter, 0, fill_t_i_b, drop_white
         dd      t_i_b, to_in, fetch, plus, number_t_i_b, fetch
         dd      sys_print, t_i_b, c_fetch, white_q, point_bool, sys_exit
+rep_loop:
+        dd      enter, 0
+.iter:  dd      get_word, dup, jump_if_not, .end
+        dd      sys_print, prompt_str, sys_print
+        dd      jump, .iter
+.end:   dd      exit
 main:
-        dd      enter, 0, fill_t_i_b, get_word, sys_print, sys_exit
+        dd      enter, 0, fill_t_i_b, rep_loop, sys_exit
 start_ip:
         dd      main
 
