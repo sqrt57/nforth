@@ -24,7 +24,7 @@
 section .data
         align   4
 here:
-        dd      doval, 0, dict_addr
+        dd      doval, 0, dictionary_start_addr
 t_i_b:
         dd      doconst, 0, tib_addr
 number_t_i_b:
@@ -55,9 +55,11 @@ prompt_str_data:
         db      " Ok",10
 .end:
 
+        align   4
+
 section .bss
         alignb  4
-dict_addr:
+dictionary_start_addr:
         resd    1024
 pstack_bottom:
 tib_addr:
@@ -148,6 +150,29 @@ rot:                            ; x1 x2 x3 -- x2 x3 x1
         jmp next
 
         align   4
+to_r:                           ; x -- ; R: -- x
+        dd      to_r+4
+        lea ebp, [ebp-4]        ; Add one cell on top of return stack
+        mov [ebp], edx          ; Push TOS on return stack
+        pop edx                 ; Fetch new TOS
+        jmp next
+
+        align   4
+r_to:                           ; -- x ; R: x --
+        dd      r_to+4
+        push edx                ; Store old TOS
+        mov edx, [ebp]          ; Pop TOS from return stack
+        lea ebp, [ebp+4]        ; Remove one cell from return cell
+        jmp next
+
+        align   4
+r_fetch:                        ; -- x; R: x -- x
+        dd      r_fetch+4
+        push edx                ; Store old TOS
+        mov edx, [ebp]          ; Fetch TOS from return stack
+        jmp next
+
+        align   4
 to_val:                         ; x -- / Gets value address from thread
         dd      to_val+4
         mov eax, [esi]          ; Get address of next word
@@ -177,7 +202,7 @@ c_fetch:                        ; addr -- c
         jmp next                ; Jump to interpreter
 
         align   4
-c_store:                        ; c addr --
+c_store:                        ; char c-addr --
         dd      c_store+4       ; Code field
         pop ebx                 ; Get C value
         mov byte [edx], bl      ; Store C at ADDR
@@ -392,6 +417,21 @@ get_word:                       ; -- addr u
         dd      inside_t_i_b, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
+c_move:                         ; c-addr1 c-addr2 u --
+        ; Copy U characters starting from C-ADDR1 to C-ADDR2
+        dd      enter, 0
+.iter:  dd      dup, lit, 0, greater_than, jump_if_not, .end
+        dd      rot, rot, over, c_fetch, over, c_store
+        dd      lit, 1, plus, swap, lit, 1, plus, swap, rot
+        dd      lit, 1, minus, jump, .iter
+.end:   dd      drop, drop, drop
+        dd      exit
+str_to_dict:                    ; c-addr u -- c-addr
+        ; Copies string (c-addr,u) to dictionary adjusting here pointer
+        ; and returns pointer to stored string
+        dd      enter, 0
+        dd      to_r, here, r_fetch, c_move
+        dd      here, here, r_to, plus, to_val, here, exit
 test_tib:
         dd      enter, 0, fill_t_i_b, drop_white
         dd      t_i_b, to_in, fetch, plus, number_t_i_b, fetch
@@ -403,7 +443,14 @@ rep_loop:
         dd      jump, .iter
 .end:   dd      exit
 main:
-        dd      enter, 0, fill_t_i_b, rep_loop, sys_exit
+        dd      enter, 0, fill_t_i_b
+        dd      get_word, dup, to_r, str_to_dict, to_r
+        dd      get_word, dup, to_r, str_to_dict, to_r
+        dd      get_word, dup, to_r, str_to_dict, to_r
+        dd      r_to, r_to, sys_print, prompt_str, sys_print
+        dd      r_to, r_to, sys_print, prompt_str, sys_print
+        dd      r_to, r_to, sys_print, prompt_str, sys_print
+        dd      sys_exit
 start_ip:
         dd      main
 
