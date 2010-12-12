@@ -428,13 +428,20 @@ cmove:                         ; c-addr1 c-addr2 u --
         dd      exit
 chars_equals:                   ; c-addr1 c-addr2 u -- b
         ; Compares two strings with the same length for equality
-        dd      enter, 0, lit, -1, exit
+        dd      enter, 0, to_r
+.iter:  dd      r_to, dup, jump_if_not, .exit
+        dd      lit, 1, minus, to_r
+        dd      over, c_fetch, over, c_fetch, equals
+        dd      rot, lit, 1, plus, rot, lit, 1, plus, rot
+        dd      zero_equals, jump_if_not, .iter
+        dd      drop, drop, r_to, drop, lit, 0, exit
+.exit:  dd      drop, drop, drop, lit, -1, exit
 str_equals:                     ; c-addr1 u1 c-addr2 u2 -- b
         ; Compares two strings for equality
         dd      enter, 0, rot, over, equals, jump_if_not, .diff_length
         dd      chars_equals, exit
 .diff_length:
-        dd      lit, -1, exit
+        dd      lit, 0, exit
 str_to_dict:                    ; c-addr u -- c-addr u
         ; Copies string (c-addr,u) to dictionary adjusting here pointer
         ; and returns pointer to stored string
@@ -453,13 +460,8 @@ rep_loop:
 .end:   dd      exit
 main:
         dd      enter, 0, fill_t_i_b
-        dd      get_word, str_to_dict, to_r, to_r
-        dd      get_word, str_to_dict, to_r, to_r
-        dd      get_word, str_to_dict, to_r, to_r
-        dd      r_to, r_to, sys_print, prompt_str, sys_print
-        dd      r_to, r_to, sys_print, prompt_str, sys_print
-        dd      r_to, r_to, sys_print, prompt_str, sys_print
-        dd      sys_exit
+        dd      get_word, get_word, str_equals, point_bool
+        dd      prompt_str, sys_print, sys_exit
 start_ip:
         dd      main
 
