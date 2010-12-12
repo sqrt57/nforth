@@ -417,7 +417,7 @@ get_word:                       ; -- addr u
         dd      inside_t_i_b, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
-c_move:                         ; c-addr1 c-addr2 u --
+cmove:                         ; c-addr1 c-addr2 u --
         ; Copy U characters starting from C-ADDR1 to C-ADDR2
         dd      enter, 0
 .iter:  dd      dup, lit, 0, greater_than, jump_if_not, .end
@@ -426,12 +426,21 @@ c_move:                         ; c-addr1 c-addr2 u --
         dd      lit, 1, minus, jump, .iter
 .end:   dd      drop, drop, drop
         dd      exit
-str_to_dict:                    ; c-addr u -- c-addr
+chars_equals:                   ; c-addr1 c-addr2 u -- b
+        ; Compares two strings with the same length for equality
+        dd      enter, 0, lit, -1, exit
+str_equals:                     ; c-addr1 u1 c-addr2 u2 -- b
+        ; Compares two strings for equality
+        dd      enter, 0, rot, over, equals, jump_if_not, .diff_length
+        dd      chars_equals, exit
+.diff_length:
+        dd      lit, -1, exit
+str_to_dict:                    ; c-addr u -- c-addr u
         ; Copies string (c-addr,u) to dictionary adjusting here pointer
         ; and returns pointer to stored string
         dd      enter, 0
-        dd      to_r, here, r_fetch, c_move
-        dd      here, here, r_to, plus, to_val, here, exit
+        dd      to_r, here, r_fetch, cmove
+        dd      here, r_fetch, here, r_to, plus, to_val, here, exit
 test_tib:
         dd      enter, 0, fill_t_i_b, drop_white
         dd      t_i_b, to_in, fetch, plus, number_t_i_b, fetch
@@ -444,9 +453,9 @@ rep_loop:
 .end:   dd      exit
 main:
         dd      enter, 0, fill_t_i_b
-        dd      get_word, dup, to_r, str_to_dict, to_r
-        dd      get_word, dup, to_r, str_to_dict, to_r
-        dd      get_word, dup, to_r, str_to_dict, to_r
+        dd      get_word, str_to_dict, to_r, to_r
+        dd      get_word, str_to_dict, to_r, to_r
+        dd      get_word, str_to_dict, to_r, to_r
         dd      r_to, r_to, sys_print, prompt_str, sys_print
         dd      r_to, r_to, sys_print, prompt_str, sys_print
         dd      r_to, r_to, sys_print, prompt_str, sys_print
