@@ -13,15 +13,20 @@
 ;
 ;--------------------------------
 ; Dictionary entry structure:
-; 00 +-------------------------
-;    | Address of next word
-; 04 +-------------------------
-;    | 
-; 
+; 00: Address of next word
+; 04: Flags
+; 08: Name length
+; 12: Name data
+; XX: Word body, code field
+; XX+08: Parameter field (if present)
+;
+; XX = align(12 + Name length), aligned to 4-byte boundary
 
         tiblen     equ     1024
 
+;--------------------------------
 section .data
+;--------------------------------
         align   4
 here:
         dd      doval, 0, dictionary_start_addr
@@ -33,6 +38,8 @@ to_in:
         dd      dovar, 0, 0
 t_i_b_max:
         dd      doconst, 0, tiblen
+word_list:
+        dd      doconst, 0, exit_entry
 true_addr:
         dd      doconst, 0, true_str_data
 true_len:
@@ -45,11 +52,12 @@ prompt_addr:
         dd      doconst, 0, prompt_str_data
 prompt_len:
         dd      doconst, 0, prompt_str_data.end-prompt_str_data
+;--------------------------------
 true_str_data:
-        db      "True",10
+        db      " True",10
 .end:
 false_str_data:
-        db      "False",10
+        db      " False",10
 .end:
 prompt_str_data:
         db      " Ok",10
@@ -57,7 +65,9 @@ prompt_str_data:
 
         align   4
 
+;--------------------------------
 section .bss
+;--------------------------------
         alignb  4
 dictionary_start_addr:
         resd    1024
@@ -67,7 +77,9 @@ tib_addr:
         alignb  4
         resd    32
 rstack_bottom:
+;--------------------------------
 section .text
+;--------------------------------
         global _start
 
 _start:
@@ -81,6 +93,7 @@ _start:
 
         jmp next                ; Jump to interpreter
 
+;--------------------------------
         align   4
 next:
         mov eax, [esi]          ; Get next word address from thread
@@ -88,6 +101,7 @@ next:
         mov edi, [eax]          ; X now points to machine code of next word
         jmp edi                 ; Jump to word machine code
 
+;--------------------------------
         align   4
 enter:
         lea ebp, [ebp-4]        ; Add one cell on top of return stack
@@ -96,20 +110,31 @@ enter:
                                 ; of current word
         jmp next                ; Jump to interpreter
 
+;--------------------------------
         align   4
 dovar:
         push edx                ; Push old TOS
         lea edx, [eax+8]        ; Get adress of parameter field
         jmp next
 
+;--------------------------------
         align   4
 doconst:
         push edx                ; Push old TOS
         mov edx, [eax+8]        ; Load TOS from parameter field
         jmp next
 
+;--------------------------------
 doval   equ     doconst
 
+;--------------------------------
+        align   4
+exit_entry:
+        dd      swap_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "exit"          ; Word name
+.nend:
         align   4
 exit:                           ; --
         dd      exit+4          ; Code field
@@ -117,24 +142,56 @@ exit:                           ; --
         lea ebp, [ebp+4]        ; Remove cell from return stack
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+swap_entry:
+        dd      drop_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "swap"          ; Word name
+.nend:
         align   4
 swap:                           ; x1 x2 -- x2 x1
         dd      swap+4          ; Code field
         xchg edx, [esp]
         jmp next
 
+;--------------------------------
+        align   4
+drop_entry:
+        dd      dup_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "drop"          ; Word name
+.nend:
         align   4
 drop:                           ; x --
         dd      drop+4
         pop edx                 ; Get new TOS
         jmp next
 
+;--------------------------------
+        align   4
+dup_entry:
+        dd      over_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "dup"           ; Word name
+.nend:
         align   4
 dup:                            ; x -- x x
         dd      dup+4
         push edx                ; Push a copy of TOS on the stack
         jmp next
 
+;--------------------------------
+        align   4
+over_entry:
+        dd      rot_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "over"          ; Word name
+.nend:
         align   4
 over:                           ; x1 x2 -- x1 x2 x1
         dd      over+4
@@ -142,6 +199,14 @@ over:                           ; x1 x2 -- x1 x2 x1
         mov edx, [esp+4]
         jmp next
 
+;--------------------------------
+        align   4
+rot_entry:
+        dd      to_r_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "rot"           ; Word name
+.nend:
         align   4
 rot:                            ; x1 x2 x3 -- x2 x3 x1
         dd      rot+4
@@ -149,6 +214,14 @@ rot:                            ; x1 x2 x3 -- x2 x3 x1
         xchg edx, [esp+4]       ; x2 x3 x1
         jmp next
 
+;--------------------------------
+        align   4
+to_r_entry:
+        dd      r_to_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ">r"            ; Word name
+.nend:
         align   4
 to_r:                           ; x -- ; R: -- x
         dd      to_r+4
@@ -157,6 +230,14 @@ to_r:                           ; x -- ; R: -- x
         pop edx                 ; Fetch new TOS
         jmp next
 
+;--------------------------------
+        align   4
+r_to_entry:
+        dd      r_fetch_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "r>"            ; Word name
+.nend:
         align   4
 r_to:                           ; -- x ; R: x --
         dd      r_to+4
@@ -165,6 +246,14 @@ r_to:                           ; -- x ; R: x --
         lea ebp, [ebp+4]        ; Remove one cell from return cell
         jmp next
 
+;--------------------------------
+        align   4
+r_fetch_entry:
+        dd      to_val_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "r@"            ; Word name
+.nend:
         align   4
 r_fetch:                        ; -- x; R: x -- x
         dd      r_fetch+4
@@ -172,6 +261,14 @@ r_fetch:                        ; -- x; R: x -- x
         mov edx, [ebp]          ; Fetch TOS from return stack
         jmp next
 
+;--------------------------------
+        align   4
+to_val_entry:
+        dd      fetch_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "to-val"        ; Word name
+.nend:
         align   4
 to_val:                         ; x -- / Gets value address from thread
         dd      to_val+4
@@ -181,12 +278,28 @@ to_val:                         ; x -- / Gets value address from thread
         pop edx                 ; Fetch new TOS
         jmp next
 
+;--------------------------------
+        align   4
+fetch_entry:
+        dd      store_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "@"             ; Word name
+.nend:
         align   4
 fetch:                          ; addr -- x
         dd      fetch+4         ; Code field
         mov edx, [edx]          ; Get X from ADDR
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+store_entry:
+        dd      c_fetch_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "!"             ; Word name
+.nend:
         align   4
 store:                          ; x addr --
         dd      store+4         ; Code field
@@ -195,12 +308,28 @@ store:                          ; x addr --
         pop edx                 ; Get new TOS
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+c_fetch_entry:
+        dd      c_store_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "c@"            ; Word name
+.nend:
         align   4
 c_fetch:                        ; addr -- c
         dd      c_fetch+4       ; Code field
         movzx edx, byte [edx]   ; Get C from ADDR
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+c_store_entry:
+        dd      and_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "c!"            ; Word name
+.nend:
         align   4
 c_store:                        ; char c-addr --
         dd      c_store+4       ; Code field
@@ -209,6 +338,7 @@ c_store:                        ; char c-addr --
         pop edx                 ; Get new TOS
         jmp next                ; Jump to interpreter
 
+;--------------------------------
         align   4
 lit:                            ; -- x / x from thread
         dd      lit+4
@@ -217,12 +347,14 @@ lit:                            ; -- x / x from thread
         lea esi, [esi+4]        ; Adjust IP
         jmp next                ; Jump to interpreter
 
+;--------------------------------
         align   4
 jump:                           ; -- / addr from thread
         dd      jump+4
         mov esi, [esi]          ; Get new IP
         jmp next
 
+;--------------------------------
         align   4
 jump_if_not:                    ; b -- / addr from thread
         ; Jumps if TOS=0 (false)
@@ -237,6 +369,14 @@ jump_if_not:                    ; b -- / addr from thread
         pop edx                 ; get new TOS
         jmp next
 
+;--------------------------------
+        align   4
+and_entry:
+        dd      or_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "and"           ; Word name
+.nend:
         align   4
 and:                            ; u1 u2 -- u
         dd      and+4           ; bit-and
@@ -244,6 +384,14 @@ and:                            ; u1 u2 -- u
         lea esp, [esp+4]        ; Remove u1 from stack
         jmp next
 
+;--------------------------------
+        align   4
+or_entry:
+        dd      zero_equals_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "or"            ; Word name
+.nend:
         align   4
 or:                             ; u1 u2 -- u
         dd      or+4            ; bit-or
@@ -251,6 +399,14 @@ or:                             ; u1 u2 -- u
         lea esp, [esp+4]        ; Remove u1 from stack
         jmp next
 
+;--------------------------------
+        align   4
+zero_equals_entry:
+        dd      equals_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "0="            ; Word name
+.nend:
         align   4
 zero_equals:                    ; b -- b
         dd      zero_equals+4
@@ -263,6 +419,14 @@ zero_equals:                    ; b -- b
         mov edx, eax            ; Store EAX value to TOS
         jmp next
 
+;--------------------------------
+        align   4
+equals_entry:
+        dd      less_than_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "="             ; Word name
+.nend:
         align   4
 equals:                         ; n/u1 n/u2 -- b
         dd      equals+4
@@ -275,6 +439,14 @@ equals:                         ; n/u1 n/u2 -- b
         mov edx, eax            ; Store result in TOS
         jmp next
 
+;--------------------------------
+        align   4
+less_than_entry:
+        dd      greater_than_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "<"             ; Word name
+.nend:
         align   4
 less_than:                      ; n1 n2 -- b
         dd      less_than+4
@@ -287,6 +459,14 @@ less_than:                      ; n1 n2 -- b
         mov edx, eax            ; Store result in TOS
         jmp next
 
+;--------------------------------
+        align   4
+greater_than_entry:
+        dd      less_or_equal_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ">"             ; Word name
+.nend:
         align   4
 greater_than:                   ; n1 n2 -- b
         dd      greater_than+4
@@ -299,6 +479,14 @@ greater_than:                   ; n1 n2 -- b
         mov edx, eax            ; Store result in TOS
         jmp next
 
+;--------------------------------
+        align   4
+less_or_equal_entry:
+        dd      greater_or_equal_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "<="            ; Word name
+.nend:
         align   4
 less_or_equal:                  ; n1 n2 -- b
         dd      less_or_equal+4
@@ -311,6 +499,14 @@ less_or_equal:                  ; n1 n2 -- b
         mov edx, eax            ; Store result in TOS
         jmp next
 
+;--------------------------------
+        align   4
+greater_or_equal_entry:
+        dd      plus_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ">="            ; Word name
+.nend:
         align   4
 greater_or_equal:               ; n1 n2 -- b
         dd      greater_or_equal+4
@@ -323,6 +519,14 @@ greater_or_equal:               ; n1 n2 -- b
         mov edx, eax            ; Store result in TOS
         jmp next
 
+;--------------------------------
+        align   4
+plus_entry:
+        dd      minus_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "+"             ; Word name
+.nend:
         align   4
 plus:                           ; n1 n2 -- n
         dd      plus+4
@@ -330,6 +534,14 @@ plus:                           ; n1 n2 -- n
         add edx, ebx            ; Add N1 to TOS=N2
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+minus_entry:
+        dd      sys_print_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "-"             ; Word name
+.nend:
         align   4
 minus:                          ; n1 n2 -- n
         dd      minus+4
@@ -338,6 +550,14 @@ minus:                          ; n1 n2 -- n
         mov edx, ebx            ; Move result to TOS
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+sys_print_entry:
+        dd      sys_read_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-print"     ; Word name
+.nend:
         align   4
 sys_print:                      ; addr u --
         dd      sys_print+4     ; Code field
@@ -349,6 +569,14 @@ sys_print:                      ; addr u --
         pop edx                 ; Get new TOS
         jmp next                ; End of code
 
+;--------------------------------
+        align   4
+sys_read_entry:
+        dd      sys_exit_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-read"      ; Word name
+.nend:
         align   4
 sys_read:                       ; addr u -- u
         dd      sys_read+4
@@ -361,6 +589,14 @@ sys_read:                       ; addr u -- u
         mov edx, eax            ; Get new TOS
         jmp next
 
+;--------------------------------
+        align   4
+sys_exit_entry:
+        dd      point_bool_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-exit"      ; Word name
+.nend:
         align   4
 sys_exit:                       ; --
         dd      sys_exit+4      ; Code field
@@ -368,6 +604,7 @@ sys_exit:                       ; --
         mov ebx, 0              ; Return code 0 - success
         int 80h                 ; Make syscall
 
+;--------------------------------
         align   4
 true_str:                       ; -- addr u
         dd      enter, 0, true_addr, true_len, exit
@@ -375,29 +612,92 @@ false_str:                      ; -- addr u
         dd      enter, 0, false_addr, false_len, exit
 prompt_str:                      ; -- addr u
         dd      enter, 0, prompt_addr, prompt_len, exit
+;--------------------------------
+        align   4
+point_bool_entry:
+        dd      fill_t_i_b_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ".b"            ; Word name
+.nend:
+        align   4
 point_bool:                     ; b --
         ; Prints boolean parameter as "True" or "False"
         dd      enter, 0, jump_if_not, .else, true_str, sys_print, exit
 .else:
         dd      false_str, sys_print, exit
+;--------------------------------
+        align   4
+fill_t_i_b_entry:
+        dd      within_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "fill-tib"      ; Word name
+.nend:
+        align   4
 fill_t_i_b:                     ; --
         dd      enter, 0, t_i_b, t_i_b_max, sys_read
         dd      number_t_i_b, store, lit, 0, to_in, store, exit
+;--------------------------------
+        align   4
+within_entry:
+        dd      plus_store_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "within"        ; Word name
+.nend:
+        align   4
 within:                         ; n1 n2 n3 -- b
         ; Returns true iff n2 <= n1 < n3, comparison is signed
         dd      enter, 0, rot, swap, over, greater_than,
         dd      rot, rot, less_or_equal, and, exit
+;--------------------------------
+        align   4
+plus_store_entry:
+        dd      white_q_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "+!"            ; Word name
+.nend:
+        align   4
 plus_store:                     ; u/n addr --
         dd      enter, 0, dup, fetch, rot, plus, swap, store, exit
+;--------------------------------
+        align   4
+white_q_entry:
+        dd      inside_t_i_b_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "white?"        ; Word name
+.nend:
+        align   4
 white_q:                        ; c -- b
         ; We consider 09-0d, 20 as whitespace
         ; (horizontal tab, line feed, vertical tab, form feed,
         ;  carriage return, space)
         dd      enter, 0, dup, lit, 09h, lit, 0eh, within
         dd      swap, lit, 20h, equals, or, exit
+;--------------------------------
+        align   4
+inside_t_i_b_entry:
+        dd      drop_white_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "inside_tib?"   ; Word name
+.nend:
+        align   4
 inside_t_i_b:                   ; -- b
         dd      enter, 0, to_in, fetch, number_t_i_b, fetch, less_than,
         dd      exit
+;--------------------------------
+        align   4
+drop_white_entry:
+        dd      get_word_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "drop-white"    ; Word name
+.nend:
+        align   4
 drop_white:                     ; --
         ; Adjusts >IN to the first non-whitespace character
         dd      enter, 0
@@ -406,6 +706,15 @@ drop_white:                     ; --
         dd      inside_t_i_b, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      exit
+;--------------------------------
+        align   4
+get_word_entry:
+        dd      cmove_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "get-word"      ; Word name
+.nend:
+        align   4
 get_word:                       ; -- addr u
         ; Reads a word from TIB starting at >IN
         ; Skips leading whitespace
@@ -417,7 +726,16 @@ get_word:                       ; -- addr u
         dd      inside_t_i_b, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
-cmove:                         ; c-addr1 c-addr2 u --
+;--------------------------------
+        align   4
+cmove_entry:
+        dd      chars_equals_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "cmove"         ; Word name
+.nend:
+        align   4
+cmove:                          ; c-addr1 c-addr2 u --
         ; Copy U characters starting from C-ADDR1 to C-ADDR2
         dd      enter, 0
 .iter:  dd      dup, lit, 0, greater_than, jump_if_not, .end
@@ -426,6 +744,15 @@ cmove:                         ; c-addr1 c-addr2 u --
         dd      lit, 1, minus, jump, .iter
 .end:   dd      drop, drop, drop
         dd      exit
+;--------------------------------
+        align   4
+chars_equals_entry:
+        dd      str_equals_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "chars="        ; Word name
+.nend:
+        align   4
 chars_equals:                   ; c-addr1 c-addr2 u -- b
         ; Compares two strings with the same length for equality
         dd      enter, 0, to_r
@@ -436,32 +763,85 @@ chars_equals:                   ; c-addr1 c-addr2 u -- b
         dd      zero_equals, jump_if_not, .iter
         dd      drop, drop, r_to, drop, lit, 0, exit
 .exit:  dd      drop, drop, drop, lit, -1, exit
+;--------------------------------
+        align   4
+str_equals_entry:
+        dd      str_to_dict_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "str="          ; Word name
+.nend:
+        align   4
 str_equals:                     ; c-addr1 u1 c-addr2 u2 -- b
         ; Compares two strings for equality
         dd      enter, 0, rot, over, equals, jump_if_not, .diff_length
         dd      chars_equals, exit
 .diff_length:
-        dd      lit, 0, exit
+        dd      drop, drop, drop, lit, 0, exit
+;--------------------------------
+        align   4
+str_to_dict_entry:
+        dd      find_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "str>dict"      ; Word name
+.nend:
+        align   4
 str_to_dict:                    ; c-addr u -- c-addr u
         ; Copies string (c-addr,u) to dictionary adjusting here pointer
         ; and returns pointer to stored string
         dd      enter, 0
         dd      to_r, here, r_fetch, cmove
         dd      here, r_fetch, here, r_to, plus, to_val, here, exit
-test_tib:
-        dd      enter, 0, fill_t_i_b, drop_white
-        dd      t_i_b, to_in, fetch, plus, number_t_i_b, fetch
-        dd      sys_print, t_i_b, c_fetch, white_q, point_bool, sys_exit
+;--------------------------------
+        align   4
+find_entry:
+        dd      rep_loop_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "find"          ; Word name
+.nend:
+        align   4
+find:                           ; c-addr u -- addr
+        dd      enter, 0, word_list, to_r, jump, .start
+.iter:
+        dd      r_to, fetch, to_r
+.start:
+        dd      r_fetch, jump_if_not, .end
+        dd      over, over, r_fetch, lit, 12, plus,
+        dd      r_fetch, lit, 8, plus, fetch, str_equals
+        dd      jump_if_not, .iter
+        dd      drop, drop, r_to, exit
+.end:
+        dd      drop, drop, r_to, exit
+;--------------------------------
+        align   4
+rep_loop_entry:
+        dd      main_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "rep-loop"      ; Word name
+.nend:
+        align   4
 rep_loop:
         dd      enter, 0
 .iter:  dd      get_word, dup, jump_if_not, .end
-        dd      sys_print, prompt_str, sys_print
+        dd      over, over, sys_print
+        dd      find, point_bool
         dd      jump, .iter
 .end:   dd      exit
+;--------------------------------
+        align   4
+main_entry:
+        dd      0               ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "main"          ; Word name
+.nend:
+        align   4
 main:
-        dd      enter, 0, fill_t_i_b
-        dd      get_word, get_word, str_equals, point_bool
-        dd      prompt_str, sys_print, sys_exit
+        dd      enter, 0, fill_t_i_b, rep_loop, sys_exit
+;--------------------------------
 start_ip:
         dd      main
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && { echo abc def  ghi | ./tutforth; }
+make && { echo drop + qwerty over | ./tutforth; }
 
 echo Exit status: $?
 
