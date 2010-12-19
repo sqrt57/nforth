@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && { echo drop + qwerty over | ./tutforth; }
+make && { echo prompt-str qwerty sys-print | ./tutforth; }
 
 echo Exit status: $?
 

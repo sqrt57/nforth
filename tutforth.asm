@@ -52,6 +52,11 @@ prompt_addr:
         dd      doconst, 0, prompt_str_data
 prompt_len:
         dd      doconst, 0, prompt_str_data.end-prompt_str_data
+word_not_found_addr:
+        dd      doconst, 0, word_not_found_str_data
+word_not_found_len:
+        dd      doconst, 0,
+        dd      word_not_found_str_data.end-word_not_found_str_data
 ;--------------------------------
 true_str_data:
         db      " True",10
@@ -61,6 +66,9 @@ false_str_data:
 .end:
 prompt_str_data:
         db      " Ok",10
+.end:
+word_not_found_str_data:
+        db      " Word not found",10
 .end:
 
         align   4
@@ -325,7 +333,7 @@ c_fetch:                        ; addr -- c
 ;--------------------------------
         align   4
 c_store_entry:
-        dd      and_entry       ; Address of next word
+        dd      execute_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "c!"            ; Word name
@@ -368,6 +376,22 @@ jump_if_not:                    ; b -- / addr from thread
 .continue:
         pop edx                 ; get new TOS
         jmp next
+
+;--------------------------------
+        align   4
+execute_entry:
+        dd      and_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "execute"       ; Word name
+.nend:
+        align   4
+execute:                        ; i*x xt -- j*x
+        dd      execute+4
+        mov eax, edx            ; Get next word address from TOS
+        mov edi, [eax]          ; X now points to machine code of XT
+        pop edx                 ; Get new TOS
+        jmp edi                 ; Jump to XT machine code
 
 ;--------------------------------
         align   4
@@ -537,7 +561,7 @@ plus:                           ; n1 n2 -- n
 ;--------------------------------
         align   4
 minus_entry:
-        dd      sys_print_entry ; Address of next word
+        dd      lshift_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "-"             ; Word name
@@ -550,6 +574,36 @@ minus:                          ; n1 n2 -- n
         mov edx, ebx            ; Move result to TOS
         jmp next                ; Jump to interpreter
 
+;--------------------------------
+        align   4
+lshift_entry:
+        dd      rshift_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "lshift"        ; Word name
+.nend:
+        align   4
+lshift:
+        dd      lshift+4
+        mov ecx, edx            ; Load count from TOS
+        pop edx                 ; Get new TOS
+        shl edx, cl             ; Perform left shift of TOS
+        jmp next
+;--------------------------------
+        align   4
+rshift_entry:
+        dd      sys_print_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "rshift"        ; Word name
+.nend:
+        align   4
+rshift:
+        dd      rshift+4
+        mov ecx, edx            ; Load count from TOS
+        pop edx                 ; Get new TOS
+        shr edx, cl             ; Perform right shift of TOS
+        jmp next
 ;--------------------------------
         align   4
 sys_print_entry:
@@ -592,7 +646,7 @@ sys_read:                       ; addr u -- u
 ;--------------------------------
         align   4
 sys_exit_entry:
-        dd      point_bool_entry        ; Address of next word
+        dd      true_str_entry  ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "sys-exit"      ; Word name
@@ -606,12 +660,48 @@ sys_exit:                       ; --
 
 ;--------------------------------
         align   4
+true_str_entry:
+        dd      false_str_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "true-str"      ; Word name
+.nend:
+        align   4
 true_str:                       ; -- addr u
         dd      enter, 0, true_addr, true_len, exit
+;--------------------------------
+        align   4
+false_str_entry:
+        dd      prompt_str_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "false-str"     ; Word name
+.nend:
+        align   4
 false_str:                      ; -- addr u
         dd      enter, 0, false_addr, false_len, exit
-prompt_str:                      ; -- addr u
+;--------------------------------
+        align   4
+prompt_str_entry:
+        dd      word_not_found_str_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "prompt-str"    ; Word name
+.nend:
+        align   4
+prompt_str:                     ; -- addr u
         dd      enter, 0, prompt_addr, prompt_len, exit
+;--------------------------------
+        align   4
+word_not_found_str_entry:
+        dd      point_bool_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "word-not-found-str"    ; Word name
+.nend:
+        align   4
+word_not_found_str:             ; -- addr u
+        dd      enter, 0, word_not_found_addr, word_not_found_len, exit
 ;--------------------------------
         align   4
 point_bool_entry:
@@ -796,7 +886,7 @@ str_to_dict:                    ; c-addr u -- c-addr u
 ;--------------------------------
         align   4
 find_entry:
-        dd      rep_loop_entry  ; Address of next word
+        dd      aligned_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "find"          ; Word name
@@ -816,6 +906,29 @@ find:                           ; c-addr u -- addr
         dd      drop, drop, r_to, exit
 ;--------------------------------
         align   4
+aligned_entry:
+        dd      to_body_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "aligned"       ; Word name
+.nend:
+        align   4
+aligned:
+        dd      enter, 0, lit, 3, plus, lit, 2, rshift, lit, 2, lshift, exit
+;--------------------------------
+        align   4
+to_body_entry:
+        dd      rep_loop_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ">body"         ; Word name
+.nend:
+        align   4
+to_body:
+        dd      enter, 0, dup, lit, 8, plus, fetch
+        dd      plus, lit, 12, plus, aligned, exit
+;--------------------------------
+        align   4
 rep_loop_entry:
         dd      main_entry      ; Address of next word
         dd      0               ; Flags
@@ -826,10 +939,13 @@ rep_loop_entry:
 rep_loop:
         dd      enter, 0
 .iter:  dd      get_word, dup, jump_if_not, .end
-        dd      over, over, sys_print
-        dd      find, point_bool
+        dd      over, over
+        dd      find, dup, jump_if_not, .err
+        dd      swap, drop, swap, drop
+        dd      to_body, execute, jump, .iter
+.err:   dd      drop, sys_print, word_not_found_str, sys_print
         dd      jump, .iter
-.end:   dd      exit
+.end:   dd      drop, drop, exit
 ;--------------------------------
         align   4
 main_entry:
