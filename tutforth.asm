@@ -28,14 +28,12 @@
 section .data
 ;--------------------------------
         align   4
-here:
-        dd      doval, 0, dictionary_start_addr
-t_i_b:
-        dd      doconst, 0, tib_addr
+here:   dd      doval, 0, dictionary_start_addr
+t_i_b:  dd      doconst, 0, tib_addr
 number_t_i_b:
         dd      dovar, 0, 0
-to_in:
-        dd      dovar, 0, 0
+to_in:  dd      dovar, 0, 0
+state:  dd      dovar, 0, 0
 t_i_b_max:
         dd      doconst, 0, tiblen
 word_list:
@@ -583,7 +581,7 @@ lshift_entry:
 .nst:   db      "lshift"        ; Word name
 .nend:
         align   4
-lshift:
+lshift:                         ; x1 u -- x2
         dd      lshift+4
         mov ecx, edx            ; Load count from TOS
         pop edx                 ; Get new TOS
@@ -598,7 +596,7 @@ rshift_entry:
 .nst:   db      "rshift"        ; Word name
 .nend:
         align   4
-rshift:
+rshift:                         ; x1 u -- x2
         dd      rshift+4
         mov ecx, edx            ; Load count from TOS
         pop edx                 ; Get new TOS
@@ -773,7 +771,7 @@ inside_t_i_b_entry:
         dd      drop_white_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "inside_tib?"   ; Word name
+.nst:   db      "inside-tib?"   ; Word name
 .nend:
         align   4
 inside_t_i_b:                   ; -- b
@@ -913,12 +911,12 @@ aligned_entry:
 .nst:   db      "aligned"       ; Word name
 .nend:
         align   4
-aligned:
+aligned:                        ; addr -- a-addr
         dd      enter, 0, lit, 3, plus, lit, 2, rshift, lit, 2, lshift, exit
 ;--------------------------------
         align   4
 to_body_entry:
-        dd      rep_loop_entry  ; Address of next word
+        dd      left_bracket_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      ">body"         ; Word name
@@ -927,6 +925,47 @@ to_body_entry:
 to_body:
         dd      enter, 0, dup, lit, 8, plus, fetch
         dd      plus, lit, 12, plus, aligned, exit
+;--------------------------------
+        align   4
+left_bracket_entry:
+        dd      right_bracket_entry     ; Address of next word
+        dd      -1              ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "["             ; Word name
+.nend:
+        align   4
+left_barcket:                   ; -- (immediate)
+        ; Changes state to interpret
+        dd      enter, 0, lit, 0, state, store, exit
+;--------------------------------
+        align   4
+right_bracket_entry:
+        dd      eval_word_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "]"         ; Word name
+.nend:
+        align   4
+right_bracket:
+        ; Changes state to compile
+        dd      enter, 0, lit, -1, state, store, exit
+;--------------------------------
+        align   4
+eval_word_entry:
+        dd      rep_loop_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "eval-word"     ; Word name
+.nend:
+        align   4
+eval_word:                      ; i*x addr -- j*x
+        ; Interprets or compiles a word according to system state
+        ; and immediate flag of the word
+        dd      enter, 0
+        dd      state, fetch, jump_if_not, .exec
+        dd      dup, lit, 4, plus, fetch, zero_equals, jump_if_not, .exec
+        dd      exit
+.exec:  dd      to_body, execute, exit
 ;--------------------------------
         align   4
 rep_loop_entry:
@@ -942,8 +981,8 @@ rep_loop:
         dd      over, over
         dd      find, dup, jump_if_not, .err
         dd      swap, drop, swap, drop
-        dd      to_body, execute, jump, .iter
-.err:   dd      drop, sys_print, word_not_found_str, sys_print
+        dd      eval_word, jump, .iter
+.err:   dd      drop, sys_print, word_not_found_str, sys_print, sys_exit
         dd      jump, .iter
 .end:   dd      drop, drop, exit
 ;--------------------------------

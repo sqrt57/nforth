@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && { echo prompt-str qwerty sys-print | ./tutforth; }
+make && { cat autotest.nf | ./tutforth; }
 
 echo Exit status: $?
 
