@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && { cat autotest.nf | ./tutforth; }
+make && { cat autotest.nf | ./nforth; }
 
 echo Exit status: $?
 

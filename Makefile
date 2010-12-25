@@ -1,11 +1,11 @@
-tutforth : tutforth.o
-	ld -o tutforth tutforth.o
+nforth : nforth.o
+	ld -o nforth nforth.o
 
-tutforth.o : tutforth.asm
-	nasm -f elf -g -F stabs tutforth.asm -o tutforth.o -l tutforth.lst
+nforth.o : nforth.asm
+	nasm -f elf -g -F stabs nforth.asm -o nforth.o -l nforth.lst
 
 clean :
-	rm *.o
+	rm -f *.o *.lst
 
 .PHONY : clean
 
