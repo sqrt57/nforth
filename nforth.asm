@@ -37,7 +37,7 @@ state:  dd      dovar, 0, 0
 t_i_b_max:
         dd      doconst, 0, tiblen
 word_list:
-        dd      doconst, 0, exit_entry
+        dd      dovar, 0, exit_entry
 true_addr:
         dd      doconst, 0, true_str_data
 true_len:
@@ -891,7 +891,7 @@ find_entry:
 .nend:
         align   4
 find:                           ; c-addr u -- addr
-        dd      enter, 0, word_list, to_r, jump, .start
+        dd      enter, 0, word_list, fetch, to_r, jump, .start
 .iter:
         dd      r_to, fetch, to_r
 .start:
@@ -905,14 +905,26 @@ find:                           ; c-addr u -- addr
 ;--------------------------------
         align   4
 aligned_entry:
-        dd      to_body_entry   ; Address of next word
+        dd      align_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "aligned"       ; Word name
 .nend:
         align   4
 aligned:                        ; addr -- a-addr
-        dd      enter, 0, lit, 3, plus, lit, 2, rshift, lit, 2, lshift, exit
+        dd      enter, 0, lit, 3, plus, lit, 2, rshift
+        dd      lit, 2, lshift, exit
+;--------------------------------
+        align   4
+align_entry:
+        dd      to_body_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "align"         ; Word name
+.nend:
+        align   4
+align_here:                     ; --
+        dd      enter, 0, here, aligned, to_val, here, exit
 ;--------------------------------
         align   4
 to_body_entry:
@@ -952,7 +964,7 @@ right_bracket:
 ;--------------------------------
         align   4
 eval_word_entry:
-        dd      rep_loop_entry  ; Address of next word
+        dd      comma_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "eval-word"     ; Word name
@@ -966,6 +978,72 @@ eval_word:                      ; i*x addr -- j*x
         dd      dup, lit, 4, plus, fetch, zero_equals, jump_if_not, .exec
         dd      exit
 .exec:  dd      to_body, execute, exit
+;--------------------------------
+        align   4
+comma_entry:
+        dd      create_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ","             ; Word name
+.nend:
+        align   4
+comma:                          ; x --
+        dd      enter, 0, here, store
+        dd      here, lit, 4, plus, to_val, here, exit
+;--------------------------------
+        align   4
+create_entry:
+        dd      zero_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "create"        ; Word name
+.nend:
+        align   4
+create:                         ; "word" --
+        dd      enter, 0,
+        dd      get_word, dup, jump_if_not, .exit
+        dd      here, to_r
+        dd      word_list, fetch, comma
+        dd      r_to, word_list, store
+        dd      lit, 0, comma
+        dd      dup, comma, dup, to_r
+        dd      here, swap, cmove
+        dd      r_to, here, plus, aligned, to_val, here,
+        dd      lit, dovar, comma, lit, 0, comma, exit
+.exit:  dd      drop, exit
+;--------------------------------
+        align   4
+zero_entry:
+        dd      one_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "0"             ; Word name
+.nend:
+        align   4
+zero:                           ; -- u
+        dd      enter, 0, lit, 0, exit
+;--------------------------------
+        align   4
+one_entry:
+        dd      four_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "1"             ; Word name
+.nend:
+        align   4
+one:                            ; -- u
+        dd      enter, 0, lit, 1, exit
+;--------------------------------
+        align   4
+four_entry:
+        dd      rep_loop_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "4"             ; Word name
+.nend:
+        align   4
+four:                           ; -- u
+        dd      enter, 0, lit, 4, exit
 ;--------------------------------
         align   4
 rep_loop_entry:
