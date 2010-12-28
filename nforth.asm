@@ -28,16 +28,78 @@
 section .data
 ;--------------------------------
         align   4
+here_entry:
+        dd      t_i_b_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "here"          ; Word name
+.nend: 
+        align   4
 here:   dd      doval, 0, dictionary_start_addr
+;--------------------------------
+        align   4
+t_i_b_entry:
+        dd      number_t_i_b_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "tib"           ; Word name
+.nend:
+        align   4
 t_i_b:  dd      doconst, 0, tib_addr
+;--------------------------------
+        align   4
+number_t_i_b_entry:
+        dd      to_in_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "#tib"          ; Word name
+.nend:
+        align   4
 number_t_i_b:
         dd      dovar, 0, 0
+;--------------------------------
+        align   4
+to_in_entry:
+        dd      state_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ">in"           ; Word name
+.nend:
+        align   4
 to_in:  dd      dovar, 0, 0
+;--------------------------------
+        align   4
+state_entry:
+        dd      t_i_b_max_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "state"         ; Word name
+.nend:
+        align   4
 state:  dd      dovar, 0, 0
+;--------------------------------
+        align   4
+t_i_b_max_entry:
+        dd      word_list_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "tib-max"       ; Word name
+.nend:
+        align   4
 t_i_b_max:
         dd      doconst, 0, tiblen
+;--------------------------------
+        align   4
+word_list_entry:
+        dd      enter_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "word-list"     ; Word name
+.nend:
+        align   4
 word_list:
-        dd      dovar, 0, exit_entry
+        dd      dovar, 0, here_entry
+;--------------------------------
 true_addr:
         dd      doconst, 0, true_str_data
 true_len:
@@ -109,6 +171,14 @@ next:
 
 ;--------------------------------
         align   4
+enter_entry:
+        dd      dovar_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-enter"      ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, enter
 enter:
         lea ebp, [ebp-4]        ; Add one cell on top of return stack
         mov [ebp], esi          ; Push IP on return stack
@@ -118,6 +188,14 @@ enter:
 
 ;--------------------------------
         align   4
+dovar_entry:
+        dd      doconst_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-var"        ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, dovar
 dovar:
         push edx                ; Push old TOS
         lea edx, [eax+8]        ; Get adress of parameter field
@@ -125,12 +203,29 @@ dovar:
 
 ;--------------------------------
         align   4
+doconst_entry:
+        dd      doval_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-const"      ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, doconst
 doconst:
         push edx                ; Push old TOS
         mov edx, [eax+8]        ; Load TOS from parameter field
         jmp next
 
 ;--------------------------------
+        align   4
+doval_entry:
+        dd      exit_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-val"        ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, doconst
 doval   equ     doconst
 
 ;--------------------------------

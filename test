@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && ./tutforth
+make && ./nforth
 
 echo Exit status: $?
 
