@@ -91,7 +91,7 @@ t_i_b_max:
 ;--------------------------------
         align   4
 word_list_entry:
-        dd      enter_entry     ; Address of next word
+        dd      last_xt_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "word-list"     ; Word name
@@ -99,6 +99,17 @@ word_list_entry:
         align   4
 word_list:
         dd      dovar, 0, here_entry
+;--------------------------------
+        align   4
+last_xt_entry:
+        dd      enter_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "last-xt"       ; Word name
+.nend:
+        align   4
+last_xt:
+        dd      dovar, 0, 0
 ;--------------------------------
 true_addr:
         dd      doconst, 0, true_str_data
@@ -225,7 +236,7 @@ doval_entry:
 .nst:   db      "do-val"        ; Word name
 .nend:
         align   4
-        dd      doconst, 0, doconst
+        dd      doconst, 0, doval
 doval   equ     doconst
 
 ;--------------------------------
@@ -426,7 +437,7 @@ c_fetch:                        ; addr -- c
 ;--------------------------------
         align   4
 c_store_entry:
-        dd      execute_entry   ; Address of next word
+        dd      lit_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "c!"            ; Word name
@@ -440,6 +451,13 @@ c_store:                        ; char c-addr --
         jmp next                ; Jump to interpreter
 
 ;--------------------------------
+        align   4
+lit_entry:
+        dd      execute_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "lit"           ; Word name
+.nend:
         align   4
 lit:                            ; -- x / x from thread
         dd      lit+4
@@ -1050,7 +1068,7 @@ right_bracket_entry:
         dd      eval_word_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "]"         ; Word name
+.nst:   db      "]"             ; Word name
 .nend:
         align   4
 right_bracket:
@@ -1071,7 +1089,7 @@ eval_word:                      ; i*x addr -- j*x
         dd      enter, 0
         dd      state, fetch, jump_if_not, .exec
         dd      dup, lit, 4, plus, fetch, zero_equals, jump_if_not, .exec
-        dd      exit
+        dd      to_body, comma, exit
 .exec:  dd      to_body, execute, exit
 ;--------------------------------
         align   4
@@ -1104,8 +1122,9 @@ create:                         ; "word" --
         dd      dup, comma, dup, to_r
         dd      here, swap, cmove
         dd      r_to, here, plus, aligned, to_val, here,
+        dd      here, last_xt, store
         dd      lit, dovar, comma, lit, 0, comma, exit
-.exit:  dd      drop, exit
+.exit:  dd      drop, drop, exit
 ;--------------------------------
         align   4
 zero_entry:
@@ -1182,7 +1201,11 @@ start_ip:
 ;--------------------------------
 bootstrap_length equ bootstrap_str.end - bootstrap_str
 bootstrap_str:
-db " create len 0 , create str 0 , "
-db " prompt-str len ! str ! "
-db " str @ len @ sys-print "
+db " create create-exec ] create do-enter last-xt @ ! exit [ "
+db "    do-enter last-xt @ ! "
+db " create-exec immediate ] 1 word-list @ 4 + ! exit [ "
+db " create-exec postpone ] get-word find >body , exit [ immediate "
+db " create-exec ; ] lit exit , postpone [ exit [ immediate "
+db " create-exec : ] create-exec ] exit [ "
 .end:
+
