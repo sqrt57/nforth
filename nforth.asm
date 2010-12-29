@@ -1168,8 +1168,21 @@ main_entry:
 .nend:
         align   4
 main:
-        dd      enter, 0, fill_t_i_b, rep_loop, sys_exit
+        dd      enter, 0, t_i_b
+        dd      lit, bootstrap_str, to_val, t_i_b
+        dd      lit, bootstrap_length, number_t_i_b, store
+        dd      lit, 0, to_in, store
+        dd      rep_loop
+        dd      to_val, t_i_b
+        dd      fill_t_i_b, rep_loop
+        dd      sys_exit
 ;--------------------------------
 start_ip:
         dd      main
-
+;--------------------------------
+bootstrap_length equ bootstrap_str.end - bootstrap_str
+bootstrap_str:
+db " create len 0 , create str 0 , "
+db " prompt-str len ! str ! "
+db " str @ len @ sys-print "
+.end:
