@@ -1,0 +1,6 @@
+#!/bin/bash
+
+make && { cat autotest.nf | ./nforth ; }
+
+echo Exit status: $?
+

@@ -22,7 +22,10 @@
 ;
 ; XX = align(12 + Name length), aligned to 4-byte boundary
 
-        tiblen     equ     1024
+        dict_len        equ     64*1024
+        tib_len         equ     64*1024
+        pstack_depth    equ     256
+        rstack_depth    equ     128
 
 ;--------------------------------
 section .data
@@ -87,7 +90,7 @@ t_i_b_max_entry:
 .nend:
         align   4
 t_i_b_max:
-        dd      doconst, 0, tiblen
+        dd      doconst, 0, tib_len
 ;--------------------------------
         align   4
 word_list_entry:
@@ -149,12 +152,14 @@ section .bss
 ;--------------------------------
         alignb  4
 dictionary_start_addr:
-        resd    1024
+        resb    dict_len
+        alignb  4
+        resd    pstack_depth
 pstack_bottom:
 tib_addr:
-        resb    tiblen
+        resb    tib_len
         alignb  4
-        resd    32
+        resd    rstack_depth
 rstack_bottom:
 ;--------------------------------
 section .text
@@ -453,7 +458,7 @@ c_store:                        ; char c-addr --
 ;--------------------------------
         align   4
 lit_entry:
-        dd      execute_entry   ; Address of next word
+        dd      jump_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "lit"           ; Word name
@@ -468,6 +473,14 @@ lit:                            ; -- x / x from thread
 
 ;--------------------------------
         align   4
+jump_entry:
+        dd      jump_if_not_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-jump"       ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, jump
 jump:                           ; -- / addr from thread
         dd      jump+4
         mov esi, [esi]          ; Get new IP
@@ -475,6 +488,14 @@ jump:                           ; -- / addr from thread
 
 ;--------------------------------
         align   4
+jump_if_not_entry:
+        dd      execute_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-jump-if-not"        ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, jump_if_not
 jump_if_not:                    ; b -- / addr from thread
         ; Jumps if TOS=0 (false)
         dd      jump_if_not+4
@@ -1207,5 +1228,10 @@ db " create-exec immediate ] 1 word-list @ 4 + ! exit [ "
 db " create-exec postpone ] get-word find >body , exit [ immediate "
 db " create-exec ; ] lit exit , postpone [ exit [ immediate "
 db " create-exec : ] create-exec ] exit [ "
+
+db " : if do-jump-if-not , here 0 , ; immediate "
+db " : else do-jump , here 0 , swap here swap ! ; immediate "
+db " : endif here swap ! ; immediate "
+
 .end:
 
