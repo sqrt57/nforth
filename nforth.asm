@@ -1233,5 +1233,8 @@ db " : if do-jump-if-not , here 0 , ; immediate "
 db " : else do-jump , here 0 , swap here swap ! ; immediate "
 db " : endif here swap ! ; immediate "
 
+db " : begin here ; immediate "
+db " : again do-jump , , ; immediate "
+
 .end:
 
