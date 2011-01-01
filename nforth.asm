@@ -1236,5 +1236,11 @@ db " : endif here swap ! ; immediate "
 db " : begin here ; immediate "
 db " : again do-jump , , ; immediate "
 
+db " : literal lit lit , , ; immediate "
+
+db " : variable create 0 , ; "
+db " : value create do-val last-xt @ ! , ; "
+db " : constant create do-const last-xt @ ! , ; "
+
 .end:
 
