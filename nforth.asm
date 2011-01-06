@@ -105,7 +105,7 @@ word_list:
 ;--------------------------------
         align   4
 last_xt_entry:
-        dd      enter_entry     ; Address of next word
+        dd      zero_char_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "last-xt"       ; Word name
@@ -113,6 +113,61 @@ last_xt_entry:
         align   4
 last_xt:
         dd      dovar, 0, 0
+;--------------------------------
+        align   4
+zero_char_entry:
+        dd      a_char_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "0c"
+.nend:
+        align   4
+zero_char:
+        dd      doconst, 0, "0"
+;--------------------------------
+        align   4
+a_char_entry:
+        dd      ua_char_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "ac"
+.nend:
+        align   4
+a_char:
+        dd      doconst, 0, "a"
+;--------------------------------
+        align   4
+ua_char_entry:
+        dd      space_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "uac"
+.nend:
+        align   4
+ua_char:
+        dd      doconst, 0, "A"
+;--------------------------------
+        align   4
+space_entry:
+        dd      minus_char_entry        ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "space"
+.nend:
+        align   4
+space:
+        dd      doconst, 0, " "
+;--------------------------------
+        align   4
+minus_char_entry:
+        dd      enter_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "minus"
+.nend:
+        align   4
+minus_char:
+        dd      doconst, 0, "-"
 ;--------------------------------
 true_addr:
         dd      doconst, 0, true_str_data
@@ -133,13 +188,13 @@ word_not_found_len:
         dd      word_not_found_str_data.end-word_not_found_str_data
 ;--------------------------------
 true_str_data:
-        db      " True",10
+        db      "True "
 .end:
 false_str_data:
-        db      " False",10
+        db      "False "
 .end:
 prompt_str_data:
-        db      " Ok",10
+        db      "Ok",10
 .end:
 word_not_found_str_data:
         db      " Word not found",10
@@ -658,7 +713,7 @@ less_or_equal:                  ; n1 n2 -- b
 ;--------------------------------
         align   4
 greater_or_equal_entry:
-        dd      plus_entry      ; Address of next word
+        dd      negate_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      ">="            ; Word name
@@ -674,7 +729,19 @@ greater_or_equal:               ; n1 n2 -- b
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
         jmp next
-
+;--------------------------------
+        align   4
+negate_entry:
+        dd      plus_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "negate"
+.nend:
+        align   4
+negate:                         ; n1 -- n2
+        dd      negate+4
+        neg edx                 ; Negate TOS
+        jmp next
 ;--------------------------------
         align   4
 plus_entry:
@@ -693,7 +760,7 @@ plus:                           ; n1 n2 -- n
 ;--------------------------------
         align   4
 minus_entry:
-        dd      lshift_entry    ; Address of next word
+        dd      mult_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "-"             ; Word name
@@ -705,7 +772,75 @@ minus:                          ; n1 n2 -- n
         sub ebx, edx            ; Subtract TOS=N2 from N1
         mov edx, ebx            ; Move result to TOS
         jmp next                ; Jump to interpreter
-
+;--------------------------------
+        align   4
+mult_entry:
+        dd      umult_entry
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "*"             ; Word name
+.nend:
+        align   4
+mult:                           ; n1 n2 -- n
+        dd      mult+4
+        imul edx, [esp]         ; Multiply N1 by N2 and put result into TOS
+        lea esp, [esp+4]        ; Drop second element from parameter stack
+        jmp next
+;--------------------------------
+        align   4
+umult_entry:
+        dd      div_mod_entry
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "u*"
+.nend:
+        align   4
+umult:                          ; u1 u2 -- u3
+        dd      umult+4
+        pop eax                 ; Load U1 into EAX
+        mul edx                 ; Multiply U1 by U2
+        mov edx, eax            ; Store result into TOS
+        jmp next
+;--------------------------------
+        align   4
+div_mod_entry:
+        dd      udiv_mod_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "/mod"          ; Word name
+.nend:
+        align   4
+div_mod:                        ; n1 n2 -- n3 n4
+        ; N3 = N1 mod N2
+        ; N4 = N1 div N2
+        dd      div_mod+4
+        mov ebx, edx            ; Store N2 in EBX
+        mov eax, [esp]          ; Store N1 in EAX
+        cdq                     ; Sign-extend N1 to EDX:EAX
+        idiv ebx                ; Signed divide N1 by N2
+        mov [esp], edx          ; Store remainder as N3
+        mov edx, eax            ; Store quotient as N4
+        jmp next
+;--------------------------------
+        align   4
+udiv_mod_entry:
+        dd      lshift_entry    ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "u/mod"
+.nend:
+        align   4
+udiv_mod:                       ; u1 u2 -- u3 u4
+        ; U3 = U1 mod U2
+        ; U4 = U1 div U2
+        dd      udiv_mod+4
+        mov ebx, edx            ; Store N2 in EBX
+        mov eax, [esp]          ; Store N1 in EAX
+        xor edx, edx            ; Zero-extend EAX to EDX:EAX
+        div ebx                 ; Unsigned divide N1 by N2
+        mov [esp], edx          ; Store remainder as N3
+        mov edx, eax            ; Store quotient as N4
+        jmp next
 ;--------------------------------
         align   4
 lshift_entry:
@@ -826,7 +961,7 @@ prompt_str:                     ; -- addr u
 ;--------------------------------
         align   4
 word_not_found_str_entry:
-        dd      point_bool_entry        ; Address of next word
+        dd      bool_point_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "word-not-found-str"    ; Word name
@@ -836,14 +971,14 @@ word_not_found_str:             ; -- addr u
         dd      enter, 0, word_not_found_addr, word_not_found_len, exit
 ;--------------------------------
         align   4
-point_bool_entry:
+bool_point_entry:
         dd      fill_t_i_b_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      ".b"            ; Word name
+.nst:   db      "b."            ; Word name
 .nend:
         align   4
-point_bool:                     ; b --
+bool_point:                     ; b --
         ; Prints boolean parameter as "True" or "False"
         dd      enter, 0, jump_if_not, .else, true_str, sys_print, exit
 .else:
@@ -1241,6 +1376,33 @@ db " : literal lit lit , , ; immediate "
 db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "
 db " : constant create do-const last-xt @ ! , ; "
+
+db " : pad here [ 4 4 4 4 * * * ] literal + ; "
+db " variable base 4 4 1 1 + + + base ! "
+db " : dig>char 0c + ; " ; u -- c
+db " : u>str begin >r base @ u/mod swap dig>char r@ c! " ; u addr1 -- addr2
+db      " dup 0= if drop r> exit endif r> 1 - again ; "
+db " : u>pad space pad 1 + c! " ; u1 -- addr u2
+db      " pad u>str pad [ 1 1 + ] literal + over - ; "
+db " : u. u>pad sys-print ; " ; u --
+db " : n>pad dup 0 < if " ; n -- addr u
+db      " negate u>pad 1 + swap 1 - minus over c! swap exit endif "
+db      " u>pad ; "
+db " : . n>pad sys-print ; " ; n --
+
+db " : char>dig 0c - ; " ; c -- u
+db " : str>uint " ; addr u1 -- u1 b
+db      " 0 >r begin dup 0= if drop drop r> 1 exit endif "
+db      " over c@ char>dig r> "
+db      " over 0 base @ within 0= if drop drop drop drop 0 0 exit endif "
+db      " base @ u* + >r "
+db      " 1 - swap 1 + swap again ; "
+db " : str>int " ; addr u -- u|n b
+db      " dup 0= if drop drop 0 0 exit endif "
+db      " over c@ minus = if "
+db              " dup 1 = if drop drop 0 0 exit endif "
+db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
+db      " str>uint ; "
 
 .end:
 
