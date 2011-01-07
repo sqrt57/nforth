@@ -4,6 +4,7 @@
 
 4 4 4 4 4 u* u* u* u* u.
 get-word 12345 str>int
-get-word -1 str>int
+get-word -6 str>int
 b. . b. .
+bye
 

@@ -32,7 +32,7 @@ section .data
 ;--------------------------------
         align   4
 here_entry:
-        dd      t_i_b_entry     ; Address of next word
+        dd      tib_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "here"          ; Word name
@@ -41,24 +41,35 @@ here_entry:
 here:   dd      doval, 0, dictionary_start_addr
 ;--------------------------------
         align   4
-t_i_b_entry:
-        dd      number_t_i_b_entry      ; Address of next word
+tib_entry:
+        dd      old_tib_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "tib"           ; Word name
 .nend:
         align   4
-t_i_b:  dd      doconst, 0, tib_addr
+tib:  dd      doval, 0, tib_addr
 ;--------------------------------
         align   4
-number_t_i_b_entry:
+old_tib_entry:
+        dd      number_tib_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "old-tib"       ; Word name
+.nend:
+        align   4
+old_tib:
+        dd      doconst, 0, tib_addr
+;--------------------------------
+        align   4
+number_tib_entry:
         dd      to_in_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "#tib"          ; Word name
 .nend:
         align   4
-number_t_i_b:
+number_tib:
         dd      dovar, 0, 0
 ;--------------------------------
         align   4
@@ -73,7 +84,7 @@ to_in:  dd      dovar, 0, 0
 ;--------------------------------
         align   4
 state_entry:
-        dd      t_i_b_max_entry ; Address of next word
+        dd      tib_max_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "state"         ; Word name
@@ -82,14 +93,14 @@ state_entry:
 state:  dd      dovar, 0, 0
 ;--------------------------------
         align   4
-t_i_b_max_entry:
+tib_max_entry:
         dd      word_list_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "tib-max"       ; Word name
 .nend:
         align   4
-t_i_b_max:
+tib_max:
         dd      doconst, 0, tib_len
 ;--------------------------------
         align   4
@@ -439,7 +450,7 @@ to_val_entry:
         dd      fetch_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "to-val"        ; Word name
+.nst:   db      "to"            ; Word name
 .nend:
         align   4
 to_val:                         ; x -- / Gets value address from thread
@@ -972,7 +983,7 @@ word_not_found_str:             ; -- addr u
 ;--------------------------------
         align   4
 bool_point_entry:
-        dd      fill_t_i_b_entry        ; Address of next word
+        dd      fill_tib_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "b."            ; Word name
@@ -985,16 +996,16 @@ bool_point:                     ; b --
         dd      false_str, sys_print, exit
 ;--------------------------------
         align   4
-fill_t_i_b_entry:
+fill_tib_entry:
         dd      within_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "fill-tib"      ; Word name
 .nend:
         align   4
-fill_t_i_b:                     ; --
-        dd      enter, 0, t_i_b, t_i_b_max, sys_read
-        dd      number_t_i_b, store, lit, 0, to_in, store, exit
+fill_tib:                     ; --
+        dd      enter, 0, tib, tib_max, sys_read
+        dd      number_tib, store, lit, 0, to_in, store, exit
 ;--------------------------------
         align   4
 within_entry:
@@ -1022,7 +1033,7 @@ plus_store:                     ; u/n addr --
 ;--------------------------------
         align   4
 white_q_entry:
-        dd      inside_t_i_b_entry      ; Address of next word
+        dd      inside_tib_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "white?"        ; Word name
@@ -1036,15 +1047,15 @@ white_q:                        ; c -- b
         dd      swap, lit, 20h, equals, or, exit
 ;--------------------------------
         align   4
-inside_t_i_b_entry:
+inside_tib_entry:
         dd      drop_white_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "inside-tib?"   ; Word name
 .nend:
         align   4
-inside_t_i_b:                   ; -- b
-        dd      enter, 0, to_in, fetch, number_t_i_b, fetch, less_than,
+inside_tib:                   ; -- b
+        dd      enter, 0, to_in, fetch, number_tib, fetch, less_than,
         dd      exit
 ;--------------------------------
         align   4
@@ -1058,9 +1069,9 @@ drop_white_entry:
 drop_white:                     ; --
         ; Adjusts >IN to the first non-whitespace character
         dd      enter, 0
-.iter:  dd      t_i_b, to_in, fetch, plus, c_fetch, white_q,
+.iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q,
         dd      jump_if_not, .end,
-        dd      inside_t_i_b, jump_if_not, .end,
+        dd      inside_tib, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      exit
 ;--------------------------------
@@ -1076,11 +1087,11 @@ get_word:                       ; -- addr u
         ; Reads a word from TIB starting at >IN
         ; Skips leading whitespace
         ; If end of TIB is reached returns length 0
-        dd      enter, 0, drop_white, t_i_b, to_in, fetch, plus
+        dd      enter, 0, drop_white, tib, to_in, fetch, plus
         dd      to_in, fetch
-.iter:  dd      t_i_b, to_in, fetch, plus, c_fetch, white_q, zero_equals
+.iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q, zero_equals
         dd      jump_if_not, .end
-        dd      inside_t_i_b, jump_if_not, .end,
+        dd      inside_tib, jump_if_not, .end,
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
 ;--------------------------------
@@ -1343,13 +1354,13 @@ main_entry:
 .nend:
         align   4
 main:
-        dd      enter, 0, t_i_b
-        dd      lit, bootstrap_str, to_val, t_i_b
-        dd      lit, bootstrap_length, number_t_i_b, store
+        dd      enter, 0
+        dd      lit, bootstrap_str, to_val, tib
+        dd      lit, bootstrap_length, number_tib, store
         dd      lit, 0, to_in, store
         dd      rep_loop
-        dd      to_val, t_i_b
-        dd      fill_t_i_b, rep_loop
+        dd      old_tib, to_val, tib
+        dd      fill_tib, rep_loop
         dd      sys_exit
 ;--------------------------------
 start_ip:
@@ -1363,6 +1374,9 @@ db " create-exec immediate ] 1 word-list @ 4 + ! exit [ "
 db " create-exec postpone ] get-word find >body , exit [ immediate "
 db " create-exec ; ] lit exit , postpone [ exit [ immediate "
 db " create-exec : ] create-exec ] exit [ "
+
+db " : nip swap drop ; "
+db " : bye sys-exit ; "
 
 db " : if do-jump-if-not , here 0 , ; immediate "
 db " : else do-jump , here 0 , swap here swap ! ; immediate "
@@ -1403,6 +1417,17 @@ db      " over c@ minus = if "
 db              " dup 1 = if drop drop 0 0 exit endif "
 db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
 db      " str>uint ; "
+
+db " : rep-loop old-tib to tib begin "
+db      " get-word dup 0= if drop drop exit endif "
+db      " over over str>int if nip nip else "
+db              " drop over over find dup if nip nip eval-word else "
+db                      " drop sys-print word-not-found-str sys-print "
+db                      " sys-exit "
+db      " endif endif again ; "
+db " : quit old-tib to tib fill-tib rep-loop quit ; "
+
+db " quit "
 
 .end:
 
