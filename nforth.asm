@@ -1298,6 +1298,7 @@ create_entry:
 create:                         ; "word" --
         dd      enter, 0,
         dd      get_word, dup, jump_if_not, .exit
+        dd      here, aligned, to_val, here
         dd      here, to_r
         dd      word_list, fetch, comma
         dd      r_to, word_list, store
@@ -1409,6 +1410,21 @@ db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "
 db " : constant create do-const last-xt @ ! , ; "
 db " : does> do-does last-xt @ ! r> last-xt @ 4 + ! ; "
+
+db " : string: create 0 , does> dup 4 + swap @ ; "
+db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
+db " : [c'] postpone c' postpone literal ; immediate "
+db " : len+! last-xt @ 4 + 4 + +! ; " ; u --
+db " : +str swap over here swap cmove dup here + to here " ; addr u --
+db      " len+! ; "
+db " : +c here c! here 1 + to here 1 len+! ; " ; c --
+db " : +c' postpone c' +c ; " ; --
+db " : char-from-tib tib >in @ + c@ ; "
+db " : skip-char begin dup char-from-tib = " ; c --
+db      " if drop 1 >in +! exit endif "
+db      " 1 >in +! again ; "
+db ` : +s" 1 >in +! >in @ [c'] " skip-char `
+db      " dup tib + swap >in @ swap - 1 - +str ; "
 
 db " : pad here [ 4 4 4 4 * * * ] literal + ; "
 db " variable base 4 4 1 1 + + + base ! "
