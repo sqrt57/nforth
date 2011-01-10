@@ -301,7 +301,7 @@ doconst:
 ;--------------------------------
         align   4
 doval_entry:
-        dd      exit_entry      ; Address of next word
+        dd      dodoes_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "do-val"        ; Word name
@@ -309,7 +309,24 @@ doval_entry:
         align   4
         dd      doconst, 0, doval
 doval   equ     doconst
-
+;--------------------------------
+        align   4
+dodoes_entry:
+        dd      exit_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "do-does"       ; Word name
+.nend:
+        align   4
+        dd      doconst, 0, dodoes
+dodoes:
+        lea ebp, [ebp-4]        ; Add one cell on top of return stack
+        mov [ebp], esi          ; Push IP on return stack
+        push edx                ; Push one cell on parameter stack
+        mov esi, [eax+4]        ; Set IP to DOES> entry for current word
+        lea edx, [eax+8]        ; Set TOS to the parameter field
+                                ; of current word
+        jmp next                ; Jump to interpreter
 ;--------------------------------
         align   4
 exit_entry:
@@ -324,7 +341,6 @@ exit:                           ; --
         mov esi, [ebp]          ; Pop IP from return stack
         lea ebp, [ebp+4]        ; Remove cell from return stack
         jmp next                ; Jump to interpreter
-
 ;--------------------------------
         align   4
 swap_entry:
@@ -1386,10 +1402,13 @@ db " : begin here ; immediate "
 db " : again do-jump , , ; immediate "
 
 db " : literal lit lit , , ; immediate "
+db " : ' get-word find >body ; " ; "word" -- xt
+db " : ['] lit lit , get-word find >body , ; immediate " ; "word" --
 
 db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "
 db " : constant create do-const last-xt @ ! , ; "
+db " : does> do-does last-xt @ ! r> last-xt @ 4 + ! ; "
 
 db " : pad here [ 4 4 4 4 * * * ] literal + ; "
 db " variable base 4 4 1 1 + + + base ! "
