@@ -1453,9 +1453,11 @@ db              " dup 1 = if drop drop 0 0 exit endif "
 db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
 db      " str>uint ; "
 
+db " : eval-int state @ if lit lit , , endif ; "
+
 db " : rep-loop old-tib to tib begin "
 db      " get-word dup 0= if drop drop exit endif "
-db      " over over str>int if nip nip else "
+db      " over over str>int if nip nip eval-int else "
 db              " drop over over find dup if nip nip eval-word else "
 db                      " drop sys-print word-not-found-str sys-print "
 db                      " sys-exit "

@@ -1,8 +1,6 @@
-string: str
-+c' a +c' b
-48 +c 10 +c
-str sys-print
-string: a +s" Hello, " +s" world!" 10 +c
-a sys-print
+: a 5 ;
+a . a . a .
+: x 2 * ;
+a x .
+a x x x .
 bye
-
