@@ -926,21 +926,33 @@ sys_read_entry:
 .nst:   db      "sys-read"      ; Word name
 .nend:
         align   4
-sys_read:                       ; addr u -- u
+sys_read:                       ; addr u1 u2 -- u3
         dd      sys_read+4
+        ; (buffer address) (buffer length) (handle)
+        ; -- (bytes read)
         mov eax, 3              ; sys_read
-        mov ebx, 0              ; Standard input
-        pop ecx                 ; Pop ADDR of buffer from pstack
-                                ; Number of bytes to read is already
-                                ; in EDX=TOS
+        mov ebx, edx            ; Standard input
+        pop edx                 ; Number of bytes to read from U1
+        pop ecx                 ; Pop ADDR of buffer
         int 80h                 ; Make syscall
         mov edx, eax            ; Get new TOS
         jmp next
+;--------------------------------
+        align   4
+sys_read_stdin_entry:
+        dd      sys_exit_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-read-stdin"        ; Word name
+.nend:
+        align   4
+sys_read_stdin:                 ; addr u -- u1
+        dd      enter, 0, lit, 0, sys_read, exit
 
 ;--------------------------------
         align   4
 sys_exit_entry:
-        dd      true_str_entry  ; Address of next word
+        dd      sys_open_ro_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "sys-exit"      ; Word name
@@ -951,6 +963,44 @@ sys_exit:                       ; --
         mov eax, 1              ; sys_exit
         mov ebx, 0              ; Return code 0 - success
         int 80h                 ; Make syscall
+
+;--------------------------------
+        align   4
+sys_open_ro_entry:
+        dd      sys_close_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-open-ro"   ; Word name
+.nend:
+        align   4
+sys_open_ro:                    ; addr -- u
+        ; Opens file with name addr (null-terminated string)
+        ; and returns file handle
+        dd      sys_open_ro+4   ; Code field
+        mov eax, 5              ; sys_open
+        mov ebx, edx            ; Address of filename from tOS
+        mov ecx, 0              ; O_RDONLY
+        int 80h                 ; Make syscall
+        mov edx, eax            ; Store result handler in TOS
+        jmp next
+
+;--------------------------------
+        align   4
+sys_close_entry:
+        dd      true_str_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-close"     ; Word name
+.nend:
+        align   4
+sys_close:                      ; u --
+        ; Closes file handle
+        dd      sys_close+4     ; Code field
+        mov eax, 6              ; sys_close
+        mov ebx, edx            ; Get file handle from TOS
+        int 80h                 ; Make syscall
+        pop edx                 ; Pop new TOS from stack
+        jmp next
 
 ;--------------------------------
         align   4
@@ -1020,7 +1070,7 @@ fill_tib_entry:
 .nend:
         align   4
 fill_tib:                     ; --
-        dd      enter, 0, tib, tib_max, sys_read
+        dd      enter, 0, tib, tib_max, sys_read_stdin
         dd      number_tib, store, lit, 0, to_in, store, exit
 ;--------------------------------
         align   4
@@ -1455,7 +1505,7 @@ db      " str>uint ; "
 
 db " : eval-int state @ if lit lit , , endif ; "
 
-db " : rep-loop old-tib to tib begin "
+db " : rep-loop begin "
 db      " get-word dup 0= if drop drop exit endif "
 db      " over over find dup if nip nip eval-word else "
 db              " drop over over str>int if nip nip eval-int else "
