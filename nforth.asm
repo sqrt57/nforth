@@ -48,7 +48,7 @@ tib_entry:
 .nst:   db      "tib"           ; Word name
 .nend:
         align   4
-tib:  dd      doval, 0, tib_addr
+tib:    dd      doval, 0, tib_addr
 ;--------------------------------
         align   4
 old_tib_entry:
@@ -116,7 +116,7 @@ word_list:
 ;--------------------------------
         align   4
 last_xt_entry:
-        dd      zero_char_entry ; Address of next word
+        dd      argc_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "last-xt"       ; Word name
@@ -124,6 +124,31 @@ last_xt_entry:
         align   4
 last_xt:
         dd      dovar, 0, 0
+
+;--------------------------------
+        align   4
+argc_entry:
+        dd      argv_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "argc"          ; Word name
+.nend:
+        align   4
+argc:
+        dd      doval, 0, 0
+
+;--------------------------------
+        align   4
+argv_entry:
+        dd      zero_char_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "argv"          ; Word name
+.nend:
+        align   4
+argv:
+        dd      doval, 0, 0
+
 ;--------------------------------
         align   4
 zero_char_entry:
@@ -236,6 +261,9 @@ _start:
         nop                     ; Makes gdb happy
 
         cld
+        mov [argc+8], esp       ; Store pointer to command line arguments
+                                ; count in argc variable
+        mov eax, [esp]
         mov esi, start_ip       ; Initialize IP
         mov ebp, rstack_bottom  ; Initialize RSP
         mov esp, pstack_bottom  ; Initialize PSP
@@ -1502,6 +1530,15 @@ db      " over c@ minus = if "
 db              " dup 1 = if drop drop 0 0 exit endif "
 db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
 db      " str>uint ; "
+
+db " : init argc 4 + to argv ; "        ; to doesn't work outside of
+db " init "                             ; word definition
+
+; Given a pointer to a null-terminated string
+; returns its length
+db " : length 0 begin "                 ; addr -- u
+db      " over c@ 0 = if nip exit endif "
+db      " 1 + swap 1 + swap again ; "
 
 db " : eval-int state @ if lit lit , , endif ; "
 

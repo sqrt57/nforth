@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make && { cat autotest.nf | ./nforth ; }
+make && { ./nforth <autotest.nf abc def ; }
 
 echo Exit status: $?
 

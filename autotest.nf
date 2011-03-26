@@ -1,7 +1,9 @@
-variable file
-string: filename +s" Makefile" 0 +c
-filename drop sys-open-ro file !
-pad 200 file @ sys-read
-pad swap sys-print
-file @ sys-close
+string: newline 10 +c
+: print-args begin
+    dup @ 0 = if drop exit endif
+    dup @ dup length sys-print
+    newline sys-print
+    4 + again ;
+argv 4 + print-args
+
 bye
