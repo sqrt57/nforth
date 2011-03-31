@@ -23,7 +23,7 @@
 ; XX = align(12 + Name length), aligned to 4-byte boundary
 
         dict_len        equ     64*1024
-        tib_len         equ     64*1024
+        input_buf_len   equ     64*1024
         pstack_depth    equ     256
         rstack_depth    equ     128
 
@@ -42,7 +42,7 @@ here:   dd      doval, 0, dictionary_start_addr
 ;--------------------------------
         align   4
 tib_entry:
-        dd      old_tib_entry   ; Address of next word
+        dd      input_buffer_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "tib"           ; Word name
@@ -51,14 +51,14 @@ tib_entry:
 tib:    dd      doval, 0, tib_addr
 ;--------------------------------
         align   4
-old_tib_entry:
-        dd      number_tib_entry      ; Address of next word
+input_buffer_entry:
+        dd      number_tib_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "old-tib"       ; Word name
+.nst:   db      "input-buffer"  ; Word name
 .nend:
         align   4
-old_tib:
+input_buffer:
         dd      doconst, 0, tib_addr
 ;--------------------------------
         align   4
@@ -84,24 +84,38 @@ to_in:  dd      dovar, 0, 0
 ;--------------------------------
         align   4
 state_entry:
-        dd      tib_max_entry ; Address of next word
+        dd      input_buffer_length_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "state"         ; Word name
 .nend:
         align   4
 state:  dd      dovar, 0, 0
+
 ;--------------------------------
         align   4
-tib_max_entry:
+input_buffer_length_entry:
+        dd      tib_length_entry; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "input-buffer-length"   ; Word name
+.nend:
+        align   4
+input_buffer_length:
+        dd      doconst, 0, input_buf_len
+
+;--------------------------------
+        align   4
+tib_length_entry:
         dd      word_list_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "tib-max"       ; Word name
+.nst:   db      "tib-length"    ; Word name
 .nend:
         align   4
-tib_max:
-        dd      doconst, 0, tib_len
+tib_length:
+        dd      doval, 0, input_buf_len
+
 ;--------------------------------
         align   4
 word_list_entry:
@@ -248,7 +262,7 @@ dictionary_start_addr:
         resd    pstack_depth
 pstack_bottom:
 tib_addr:
-        resb    tib_len
+        resb    input_buf_len
         alignb  4
         resd    rstack_depth
 rstack_bottom:
@@ -1098,7 +1112,7 @@ fill_tib_entry:
 .nend:
         align   4
 fill_tib:                     ; --
-        dd      enter, 0, tib, tib_max, sys_read_stdin
+        dd      enter, 0, tib, tib_length, sys_read_stdin
         dd      number_tib, store, lit, 0, to_in, store, exit
 ;--------------------------------
         align   4
@@ -1454,15 +1468,15 @@ main:
         dd      lit, bootstrap_length, number_tib, store
         dd      lit, 0, to_in, store
         dd      rep_loop
-        dd      old_tib, to_val, tib
-        dd      fill_tib, rep_loop
-        dd      sys_exit
+
 ;--------------------------------
 start_ip:
         dd      main
+
 ;--------------------------------
 bootstrap_length equ bootstrap_str.end - bootstrap_str
 bootstrap_str:
+
 db " create create-exec ] create do-enter last-xt @ ! exit [ "
 db "    do-enter last-xt @ ! "
 db " create-exec immediate ] 1 word-list @ 4 + ! exit [ "
@@ -1549,9 +1563,33 @@ db              " drop over over str>int if nip nip eval-int else "
 db                      " drop sys-print word-not-found-str sys-print "
 db                      " sys-exit "
 db      " endif endif again ; "
-db " : quit old-tib to tib fill-tib rep-loop quit ; "
 
-db " quit "
+db " : update-tib-length input-buffer input-buffer-length + "
+db      " tib - to tib-length ; "
+
+db " : push-tib tib #tib @ + aligned "
+db      " tib over ! 4 + "
+db      " #tib @ over ! 4 + "
+db      " >in @ over ! 4 + "
+db      " to tib update-tib-length ; "
+
+db " : pop-tib tib 4 - "
+db      " dup @ >in ! 4 - "
+db      " dup @ #tib ! 4 - "
+db      " dup @ to tib "
+db      " drop update-tib-length ; "
+
+db " : read-to-tib >r tib tib-length r> sys-read " ; file-handle -- 
+db      " #tib ! 0 >in ! ; "
+
+db " : include-file " ; file-handle --
+db      " push-tib read-to-tib rep-loop pop-tib ; "
+
+db " : included drop sys-open-ro dup >r include-file r> sys-close ; "
+
+db " : main input-buffer to tib begin fill-tib rep-loop again ; "
+
+db " main "
 
 .end:
 

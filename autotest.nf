@@ -1,9 +1,7 @@
-string: newline 10 +c
-: print-args begin
-    dup @ 0 = if drop exit endif
-    dup @ dup length sys-print
-    newline sys-print
-    4 + again ;
-argv 4 + print-args
+string: filename-a +s" a.nf" 0 +c
+string: filename-b +s" b.nf" 0 +c
 
+filename-a included
+
+prompt-str sys-print
 bye
