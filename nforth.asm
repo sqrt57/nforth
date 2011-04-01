@@ -28,6 +28,18 @@
         rstack_depth    equ     128
 
 ;--------------------------------
+; Direct threaded code interpreter
+%macro  Next 0
+
+        mov eax, [esi]          ; Get next word address from thread
+        lea esi, [esi+4]        ; Adjust IP
+        mov edi, [eax]          ; X now points to machine code
+                                ; of next word
+        jmp edi                 ; Jump to word machine code
+
+%endmacro
+
+;--------------------------------
 section .data
 ;--------------------------------
         align   4
@@ -275,23 +287,16 @@ _start:
         nop                     ; Makes gdb happy
 
         cld
-        mov [argc+8], esp       ; Store pointer to command line arguments
-                                ; count in argc variable
+        mov [argc+8], esp       ; Store pointer to
+                                ; command line arguments count
+                                ; in argc variable
         mov eax, [esp]
         mov esi, start_ip       ; Initialize IP
         mov ebp, rstack_bottom  ; Initialize RSP
         mov esp, pstack_bottom  ; Initialize PSP
         mov edx, 0              ; Initialize TOS
 
-        jmp next                ; Jump to interpreter
-
-;--------------------------------
-        align   4
-next:
-        mov eax, [esi]          ; Get next word address from thread
-        lea esi, [esi+4]        ; Adjust IP
-        mov edi, [eax]          ; X now points to machine code of next word
-        jmp edi                 ; Jump to word machine code
+        Next                    ; Start interpreter
 
 ;--------------------------------
         align   4
@@ -308,7 +313,7 @@ enter:
         mov [ebp], esi          ; Push IP on return stack
         lea esi, [eax+8]        ; Set IP to the parameter field
                                 ; of current word
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -323,7 +328,7 @@ dovar_entry:
 dovar:
         push edx                ; Push old TOS
         lea edx, [eax+8]        ; Get adress of parameter field
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -338,7 +343,7 @@ doconst_entry:
 doconst:
         push edx                ; Push old TOS
         mov edx, [eax+8]        ; Load TOS from parameter field
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -368,7 +373,7 @@ dodoes:
         mov esi, [eax+4]        ; Set IP to DOES> entry for current word
         lea edx, [eax+8]        ; Set TOS to the parameter field
                                 ; of current word
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 ;--------------------------------
         align   4
 exit_entry:
@@ -382,7 +387,7 @@ exit:                           ; --
         dd      exit+4          ; Code field
         mov esi, [ebp]          ; Pop IP from return stack
         lea ebp, [ebp+4]        ; Remove cell from return stack
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 ;--------------------------------
         align   4
 swap_entry:
@@ -395,7 +400,7 @@ swap_entry:
 swap:                           ; x1 x2 -- x2 x1
         dd      swap+4          ; Code field
         xchg edx, [esp]
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -409,7 +414,7 @@ drop_entry:
 drop:                           ; x --
         dd      drop+4
         pop edx                 ; Get new TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -423,7 +428,7 @@ dup_entry:
 dup:                            ; x -- x x
         dd      dup+4
         push edx                ; Push a copy of TOS on the stack
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -438,7 +443,7 @@ over:                           ; x1 x2 -- x1 x2 x1
         dd      over+4
         push edx
         mov edx, [esp+4]
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -453,7 +458,7 @@ rot:                            ; x1 x2 x3 -- x2 x3 x1
         dd      rot+4
         xchg edx, [esp]         ; x1 x3 x2
         xchg edx, [esp+4]       ; x2 x3 x1
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -469,7 +474,7 @@ to_r:                           ; x -- ; R: -- x
         lea ebp, [ebp-4]        ; Add one cell on top of return stack
         mov [ebp], edx          ; Push TOS on return stack
         pop edx                 ; Fetch new TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -485,7 +490,7 @@ r_to:                           ; -- x ; R: x --
         push edx                ; Store old TOS
         mov edx, [ebp]          ; Pop TOS from return stack
         lea ebp, [ebp+4]        ; Remove one cell from return cell
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -500,7 +505,7 @@ r_fetch:                        ; -- x; R: x -- x
         dd      r_fetch+4
         push edx                ; Store old TOS
         mov edx, [ebp]          ; Fetch TOS from return stack
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -517,7 +522,7 @@ to_val:                         ; x -- / Gets value address from thread
         mov [eax+8], edx        ; Store TOS inparameter field of next word
         lea esi, [esi+4]        ; Adjust IP
         pop edx                 ; Fetch new TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -531,7 +536,7 @@ fetch_entry:
 fetch:                          ; addr -- x
         dd      fetch+4         ; Code field
         mov edx, [edx]          ; Get X from ADDR
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -547,7 +552,7 @@ store:                          ; x addr --
         pop ebx                 ; Get X value
         mov [edx], ebx          ; Store X at ADDR
         pop edx                 ; Get new TOS
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -561,7 +566,7 @@ c_fetch_entry:
 c_fetch:                        ; addr -- c
         dd      c_fetch+4       ; Code field
         movzx edx, byte [edx]   ; Get C from ADDR
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -577,7 +582,7 @@ c_store:                        ; char c-addr --
         pop ebx                 ; Get C value
         mov byte [edx], bl      ; Store C at ADDR
         pop edx                 ; Get new TOS
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -593,7 +598,7 @@ lit:                            ; -- x / x from thread
         push edx                ; Store old TOS
         mov edx, [esi]          ; Read X from thread into TOS
         lea esi, [esi+4]        ; Adjust IP
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -608,7 +613,7 @@ jump_entry:
 jump:                           ; -- / addr from thread
         dd      jump+4
         mov esi, [esi]          ; Get new IP
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -631,7 +636,7 @@ jump_if_not:                    ; b -- / addr from thread
         mov esi, [esi-4]        ; Get new IP (if TOS=0)
 .continue:
         pop edx                 ; get new TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -662,7 +667,7 @@ and:                            ; u1 u2 -- u
         dd      and+4           ; bit-and
         and edx, [esp]          ; TOS <- U1 and U2
         lea esp, [esp+4]        ; Remove u1 from stack
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -677,7 +682,7 @@ or:                             ; u1 u2 -- u
         dd      or+4            ; bit-or
         or edx, [esp]           ; TOS <- U1 or U2
         lea esp, [esp+4]        ; Remove u1 from stack
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -697,7 +702,7 @@ zero_equals:                    ; b -- b
         dec eax                 ; EAX is now -1
 .continue:
         mov edx, eax            ; Store EAX value to TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -717,7 +722,7 @@ equals:                         ; n/u1 n/u2 -- b
 .continue:
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -737,7 +742,7 @@ less_than:                      ; n1 n2 -- b
 .continue:
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -757,7 +762,7 @@ greater_than:                   ; n1 n2 -- b
 .continue:
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -777,7 +782,7 @@ less_or_equal:                  ; n1 n2 -- b
 .continue:
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -797,7 +802,7 @@ greater_or_equal:               ; n1 n2 -- b
 .continue:
         lea esp, [esp+4]        ; Remove n1 from parameter stack
         mov edx, eax            ; Store result in TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 negate_entry:
@@ -810,7 +815,7 @@ negate_entry:
 negate:                         ; n1 -- n2
         dd      negate+4
         neg edx                 ; Negate TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 plus_entry:
@@ -824,7 +829,7 @@ plus:                           ; n1 n2 -- n
         dd      plus+4
         pop ebx                 ; Get N1 from the stack
         add edx, ebx            ; Add N1 to TOS=N2
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 
 ;--------------------------------
         align   4
@@ -840,7 +845,7 @@ minus:                          ; n1 n2 -- n
         pop ebx                 ; Get N1 from the stack
         sub ebx, edx            ; Subtract TOS=N2 from N1
         mov edx, ebx            ; Move result to TOS
-        jmp next                ; Jump to interpreter
+        Next                    ; Include interpreter
 ;--------------------------------
         align   4
 mult_entry:
@@ -854,7 +859,7 @@ mult:                           ; n1 n2 -- n
         dd      mult+4
         imul edx, [esp]         ; Multiply N1 by N2 and put result into TOS
         lea esp, [esp+4]        ; Drop second element from parameter stack
-        jmp next
+        Next
 ;--------------------------------
         align   4
 umult_entry:
@@ -869,7 +874,7 @@ umult:                          ; u1 u2 -- u3
         pop eax                 ; Load U1 into EAX
         mul edx                 ; Multiply U1 by U2
         mov edx, eax            ; Store result into TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 div_mod_entry:
@@ -889,7 +894,7 @@ div_mod:                        ; n1 n2 -- n3 n4
         idiv ebx                ; Signed divide N1 by N2
         mov [esp], edx          ; Store remainder as N3
         mov edx, eax            ; Store quotient as N4
-        jmp next
+        Next
 ;--------------------------------
         align   4
 udiv_mod_entry:
@@ -909,7 +914,7 @@ udiv_mod:                       ; u1 u2 -- u3 u4
         div ebx                 ; Unsigned divide N1 by N2
         mov [esp], edx          ; Store remainder as N3
         mov edx, eax            ; Store quotient as N4
-        jmp next
+        Next
 ;--------------------------------
         align   4
 lshift_entry:
@@ -924,7 +929,7 @@ lshift:                         ; x1 u -- x2
         mov ecx, edx            ; Load count from TOS
         pop edx                 ; Get new TOS
         shl edx, cl             ; Perform left shift of TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 rshift_entry:
@@ -939,7 +944,7 @@ rshift:                         ; x1 u -- x2
         mov ecx, edx            ; Load count from TOS
         pop edx                 ; Get new TOS
         shr edx, cl             ; Perform right shift of TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 sys_print_entry:
@@ -957,7 +962,7 @@ sys_print:                      ; addr u --
         pop ecx                 ; Address of string
         int 80h                 ; Make syscall
         pop edx                 ; Get new TOS
-        jmp next                ; End of code
+        Next                ; End of code
 
 ;--------------------------------
         align   4
@@ -978,7 +983,7 @@ sys_read:                       ; addr u1 file-handle -- u3
         pop ecx                 ; Pop ADDR of buffer
         int 80h                 ; Make syscall
         mov edx, eax            ; Get new TOS
-        jmp next
+        Next
 ;--------------------------------
         align   4
 sys_read_stdin_entry:
@@ -1024,7 +1029,7 @@ sys_open_ro:                    ; addr -- u
         mov ecx, 0              ; O_RDONLY
         int 80h                 ; Make syscall
         mov edx, eax            ; Store result handler in TOS
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
@@ -1042,7 +1047,7 @@ sys_close:                      ; u --
         mov ebx, edx            ; Get file handle from TOS
         int 80h                 ; Make syscall
         pop edx                 ; Pop new TOS from stack
-        jmp next
+        Next
 
 ;--------------------------------
         align   4
