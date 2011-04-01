@@ -1444,7 +1444,7 @@ four_entry:
         dd      rep_loop_entry  ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "4"             ; Word name
+.nst:   db      "four"          ; Word name
 .nend:
         align   4
 four:                           ; -- u
@@ -1494,7 +1494,7 @@ bootstrap_str:
 
 db " create create-exec ] create do-enter last-xt @ ! exit [ "
 db "    do-enter last-xt @ ! "
-db " create-exec immediate ] 1 word-list @ 4 + ! exit [ "
+db " create-exec immediate ] 1 word-list @ four + ! exit [ "
 db " create-exec postpone ] get-word find >body , exit [ immediate "
 db " create-exec ; ] lit exit , postpone [ exit [ immediate "
 db " create-exec : ] create-exec ] exit [ "
@@ -1516,13 +1516,13 @@ db " : ['] lit lit , get-word find >body , ; immediate " ; "word" --
 db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "
 db " : constant create do-const last-xt @ ! , ; "
-db " : does> do-does last-xt @ ! r> last-xt @ 4 + ! ; "
+db " : does> do-does last-xt @ ! r> last-xt @ four + ! ; "
 db " : recurse last-xt @ , ; immediate "
 
-db " : string: create 0 , does> dup 4 + swap @ ; "
+db " : string: create 0 , does> dup four + swap @ ; "
 db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
 db " : [c'] postpone c' postpone literal ; immediate "
-db " : len+! last-xt @ 4 + 4 + +! ; " ; u --
+db " : len+! last-xt @ four + four + +! ; " ; u --
 db " : +str swap over here swap cmove dup here + to here " ; addr u --
 db      " len+! ; "
 db " : +c here c! here 1 + to here 1 len+! ; " ; c --
@@ -1534,12 +1534,21 @@ db      " 1 >in +! again ; "
 db ` : +s" 1 >in +! >in @ [c'] " skip-char `
 db      " dup tib + swap >in @ swap - 1 - +str ; "
 
-db " : ( )c skip-char ; immediate "
-db " : \ [ 4 4 1 1 + + + ] literal skip-char ; immediate "
+db " : ten [ four four 1 1 + + + ] literal ; "
+db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
 
-db " : pad here [ 4 4 4 4 * * * ] literal + ; "
-db " variable base 4 4 1 1 + + + base ! "
-db " : dig>char 0c + ; " ; u -- c
+db " : ( )c skip-char ; immediate " ; Skips to )
+db " : \ ten literal skip-char ; immediate " ; Skips to end of line
+
+db " variable base "
+db " : dec ten base ! ; "
+db " : oct [ four four + ] literal base ! ; "
+db " : hex [ ten four 1 1 + + + ] literal base ! ; "
+db " : bin [ 1 1 + ] literal base ! ; "
+db " dec "
+
+db " : pad here [ ten ten * ] literal + ; "
+db " : dig>char dup ten < if 0c + else ten - ac + endif ; " ; u -- c
 db " : u>str begin >r base @ u/mod swap dig>char r@ c! " ; u addr1 -- addr2
 db      " dup 0= if drop r> exit endif r> 1 - again ; "
 db " : u>pad space pad 1 + c! " ; u1 -- addr u2
@@ -1550,7 +1559,12 @@ db      " negate u>pad 1 + swap 1 - minus over c! swap exit endif "
 db      " u>pad ; "
 db " : . n>pad sys-print ; " ; n --
 
-db " : char>dig 0c - ; " ; c -- u
+;db " : char>dig 0c - ; " ; c -- u
+db " : char>dig " ; c -- u
+db      " dup 0c [ 0c ten + ] literal within if 0c - else "
+db      " dup  ac [  ac twenty-six + ] literal within if  ac - ten + else "
+db      " dup uac [ uac twenty-six + ] literal within if uac - ten + else "
+db      " [ 0 1 - ] literal endif endif endif ; "
 db " : str>uint " ; addr u1 -- u1 b
 db      " 0 >r begin dup 0= if drop drop r> 1 exit endif "
 db      " over c@ char>dig r> "
@@ -1564,7 +1578,7 @@ db              " dup 1 = if drop drop 0 0 exit endif "
 db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
 db      " str>uint ; "
 
-db " : init argc 4 + to argv ; "        ; to doesn't work outside of
+db " : init argc four + to argv ; "     ; to doesn't work outside of
 db " init "                             ; word definition
 
 ; Given a pointer to a null-terminated string
@@ -1586,13 +1600,13 @@ db      " endif endif again ; "
 db " : update-tib-length input-buffer input-buffer-length + "
 db      " tib - to tib-length ; "
 db " : push-tib tib #tib @ + aligned "
-db      " tib over ! 4 + "
-db      " #tib @ over ! 4 + "
-db      " >in @ over ! 4 + "
+db      " tib over ! four + "
+db      " #tib @ over ! four + "
+db      " >in @ over ! four + "
 db      " to tib update-tib-length ; "
-db " : pop-tib tib 4 - "
-db      " dup @ >in ! 4 - "
-db      " dup @ #tib ! 4 - "
+db " : pop-tib tib four - "
+db      " dup @ >in ! four - "
+db      " dup @ #tib ! four - "
 db      " dup @ to tib "
 db      " drop update-tib-length ; "
 db " : read-to-tib >r tib tib-length r> sys-read " ; file-handle -- u 
@@ -1604,7 +1618,7 @@ db      " push-tib drop exec-file pop-tib ; "
 
 db " : init-tib input-buffer to tib update-tib-length ; "
 db " : exec-arg drop exit 0 exec-file ; "
-db " : for-each-arg argv begin 4 + " ; xt --
+db " : for-each-arg argv begin four + " ; xt --
 db      " dup @ 0 = if drop drop exit endif "
 db      " over over @ swap execute again ; "
 db " : exec-args ['] exec-file for-each-arg ; "
