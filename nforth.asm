@@ -24,6 +24,7 @@
 
         dict_len        equ     64*1024
         input_buf_len   equ     64*1024
+        string_buf_len  equ     8*1024
         pstack_depth    equ     256
         rstack_depth    equ     128
 
@@ -118,7 +119,7 @@ input_buffer_length:
 ;--------------------------------
         align   4
 tib_length_entry:
-        dd      word_list_entry ; Address of next word
+        dd      string_buffer_entry ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "tib-length"    ; Word name
@@ -126,6 +127,30 @@ tib_length_entry:
         align   4
 tib_length:
         dd      doval, 0, input_buf_len
+
+;--------------------------------
+        align   4
+string_buffer_entry:
+        dd      string_buffer_length_entry  ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "string-buffer" ; Word name
+.nend:
+        align   4
+string_buffer:
+        dd      doconst, 0, string_buf
+
+;--------------------------------
+        align   4
+string_buffer_length_entry:
+        dd      word_list_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "string-buffer-length"  ; Word name
+.nend:
+        align   4
+string_buffer_length:
+        dd      doconst, 0, string_buf_len
 
 ;--------------------------------
         align   4
@@ -288,6 +313,8 @@ tib_addr:
         alignb  4
         resd    rstack_depth
 rstack_bottom:
+string_buf:
+        resb    string_buf_len
 ;--------------------------------
 section .text
 ;--------------------------------
@@ -1519,6 +1546,11 @@ db " : constant create do-const last-xt @ ! , ; "
 db " : does> do-does last-xt @ ! r> last-xt @ four + ! ; "
 db " : recurse last-xt @ , ; immediate "
 
+db " : char-from-tib tib >in @ + c@ ; "
+db " : skip-char begin dup char-from-tib = " ; c --
+db      " if drop 1 >in +! exit endif "
+db      " 1 >in +! again ; "
+
 db " : string: create 0 , does> dup four + swap @ ; "
 db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
 db " : [c'] postpone c' postpone literal ; immediate "
@@ -1527,12 +1559,22 @@ db " : +str swap over here swap cmove dup here + to here " ; addr u --
 db      " len+! ; "
 db " : +c here c! here 1 + to here 1 len+! ; " ; c --
 db " : +c' postpone c' +c ; " ; --
-db " : char-from-tib tib >in @ + c@ ; "
-db " : skip-char begin dup char-from-tib = " ; c --
-db      " if drop 1 >in +! exit endif "
-db      " 1 >in +! again ; "
 db ` : +s" 1 >in +! >in @ [c'] " skip-char `
 db      " dup tib + swap >in @ swap - 1 - +str ; "
+
+db " string-buffer value string-here "
+db " 0 value last-string "
+db " : do-string dup four + swap @ ; " ; addr -- addr u
+db " : new-string string-here to last-string "
+db      " lit lit , string-here , ['] do-string , "
+db      " 0 string-here ! "
+db      " string-here four + to string-here ; "
+db " : len+! last-string +! ; " ; u --
+db " : +str swap over string-here swap cmove " ; addr u --
+db      " dup len+! string-here + to string-here ; "
+db ` : +s" 1 >in +! >in @ [c'] " skip-char `
+db      " dup tib + swap >in @ swap - 1 - +str ; immediate "
+db ` : s" new-string postpone +s" ; immediate `
 
 db " : ten [ four four 1 1 + + + ] literal ; "
 db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
@@ -1559,7 +1601,6 @@ db      " negate u>pad 1 + swap 1 - minus over c! swap exit endif "
 db      " u>pad ; "
 db " : . n>pad sys-print ; " ; n --
 
-;db " : char>dig 0c - ; " ; c -- u
 db " : char>dig " ; c -- u
 db      " dup 0c [ 0c ten + ] literal within if 0c - else "
 db      " dup  ac [  ac twenty-six + ] literal within if  ac - ten + else "
