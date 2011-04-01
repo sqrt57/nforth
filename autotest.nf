@@ -1,6 +1,6 @@
-string: filename-a +s" a.nf" 0 +c
-string: filename-b +s" b.nf" 0 +c
+( dsfd )
+prompt-str sys-print \ Comment
 
-filename-a included
-
-prompt-str sys-print
+: a ( -- ) 57 . \ Prints 57
+    ;
+a prompt-str sys-print

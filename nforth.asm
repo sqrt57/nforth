@@ -33,8 +33,7 @@
 
         mov eax, [esi]          ; Get next word address from thread
         lea esi, [esi+4]        ; Adjust IP
-        mov edi, [eax]          ; X now points to machine code
-                                ; of next word
+        mov edi, [eax]          ; X now points to machine code of next word
         jmp edi                 ; Jump to word machine code
 
 %endmacro
@@ -222,7 +221,7 @@ space:
 ;--------------------------------
         align   4
 minus_char_entry:
-        dd      enter_entry     ; Address of next word
+        dd      right_paren_char_entry  ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "minus"
@@ -230,6 +229,17 @@ minus_char_entry:
         align   4
 minus_char:
         dd      doconst, 0, "-"
+;--------------------------------
+        align   4
+right_paren_char_entry:
+        dd      enter_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      ")c"
+.nend:
+        align   4
+right_paren_char:
+        dd      doconst, 0, ")"
 ;--------------------------------
 true_addr:
         dd      doconst, 0, true_str_data
@@ -1523,6 +1533,9 @@ db      " if drop 1 >in +! exit endif "
 db      " 1 >in +! again ; "
 db ` : +s" 1 >in +! >in @ [c'] " skip-char `
 db      " dup tib + swap >in @ swap - 1 - +str ; "
+
+db " : ( )c skip-char ; immediate "
+db " : \ [ 4 4 1 1 + + + ] literal skip-char ; immediate "
 
 db " : pad here [ 4 4 4 4 * * * ] literal + ; "
 db " variable base 4 4 1 1 + + + base ! "
