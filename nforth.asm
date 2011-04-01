@@ -968,12 +968,12 @@ sys_read_entry:
 .nst:   db      "sys-read"      ; Word name
 .nend:
         align   4
-sys_read:                       ; addr u1 u2 -- u3
+sys_read:                       ; addr u1 file-handle -- u3
         dd      sys_read+4
-        ; (buffer address) (buffer length) (handle)
+        ; (buffer address) (buffer length) (file handle)
         ; -- (bytes read)
         mov eax, 3              ; sys_read
-        mov ebx, edx            ; Standard input
+        mov ebx, edx            ; File handle
         pop edx                 ; Number of bytes to read from U1
         pop ecx                 ; Pop ADDR of buffer
         int 80h                 ; Make syscall
@@ -1566,7 +1566,6 @@ db      " endif endif again ; "
 
 db " : update-tib-length input-buffer input-buffer-length + "
 db      " tib - to tib-length ; "
-
 db " : push-tib tib #tib @ + aligned "
 db      " tib over ! 4 + "
 db      " #tib @ over ! 4 + "
@@ -1577,10 +1576,10 @@ db      " dup @ >in ! 4 - "
 db      " dup @ #tib ! 4 - "
 db      " dup @ to tib "
 db      " drop update-tib-length ; "
-db " : read-to-tib >r tib tib-length r> sys-read " ; file-handle -- 
-db      " #tib ! 0 >in ! ; "
+db " : read-to-tib >r tib tib-length r> sys-read " ; file-handle -- u 
+db      " dup #tib ! 0 >in ! ; "
 db " : exec-file " ; addr --
-db      " sys-open-ro dup read-to-tib sys-close eval-loop ; "
+db      " sys-open-ro dup read-to-tib drop sys-close eval-loop ; "
 db " : included " ; addr u --
 db      " push-tib drop exec-file pop-tib ; "
 
@@ -1590,8 +1589,9 @@ db " : for-each-arg argv begin 4 + " ; xt --
 db      " dup @ 0 = if drop drop exit endif "
 db      " over over @ swap execute again ; "
 db " : exec-args ['] exec-file for-each-arg ; "
-db " : exec-stdin begin 0 read-to-tib eval-loop again ; "
-db " : main init-tib exec-args exec-stdin ; "
+db " : exec-stdin begin 0 read-to-tib 0= if exit endif "
+db      " eval-loop again ; "
+db " : main init-tib exec-args exec-stdin bye ; "
 
 db " main "
 
