@@ -1556,7 +1556,7 @@ db      " 1 + swap 1 + swap again ; "
 
 db " : eval-int state @ if lit lit , , endif ; "
 
-db " : rep-loop begin "
+db " : eval-loop begin "
 db      " get-word dup 0= if drop drop exit endif "
 db      " over over find dup if nip nip eval-word else "
 db              " drop over over str>int if nip nip eval-int else "
@@ -1572,22 +1572,26 @@ db      " tib over ! 4 + "
 db      " #tib @ over ! 4 + "
 db      " >in @ over ! 4 + "
 db      " to tib update-tib-length ; "
-
 db " : pop-tib tib 4 - "
 db      " dup @ >in ! 4 - "
 db      " dup @ #tib ! 4 - "
 db      " dup @ to tib "
 db      " drop update-tib-length ; "
-
 db " : read-to-tib >r tib tib-length r> sys-read " ; file-handle -- 
 db      " #tib ! 0 >in ! ; "
+db " : exec-file " ; addr --
+db      " sys-open-ro dup read-to-tib sys-close eval-loop ; "
+db " : included " ; addr u --
+db      " push-tib drop exec-file pop-tib ; "
 
-db " : include-file " ; file-handle --
-db      " push-tib read-to-tib rep-loop pop-tib ; "
-
-db " : included drop sys-open-ro dup >r include-file r> sys-close ; "
-
-db " : main input-buffer to tib begin fill-tib rep-loop again ; "
+db " : init-tib input-buffer to tib update-tib-length ; "
+db " : exec-arg drop exit 0 exec-file ; "
+db " : for-each-arg argv begin 4 + " ; xt --
+db      " dup @ 0 = if drop drop exit endif "
+db      " over over @ swap execute again ; "
+db " : exec-args ['] exec-file for-each-arg ; "
+db " : exec-stdin begin 0 read-to-tib eval-loop again ; "
+db " : main init-tib exec-args exec-stdin ; "
 
 db " main "
 
