@@ -1,6 +1,6 @@
 : fib dup 1 <= if drop 1 exit else
-    dup 1 - fib
-    swap 2 - fib
+    dup 1 - recurse
+    swap 2 - recurse
     + endif ;
 
 35 fib .

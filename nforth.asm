@@ -1502,6 +1502,7 @@ db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "
 db " : constant create do-const last-xt @ ! , ; "
 db " : does> do-does last-xt @ ! r> last-xt @ 4 + ! ; "
+db " : recurse last-xt @ , ; immediate "
 
 db " : string: create 0 , does> dup 4 + swap @ ; "
 db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
