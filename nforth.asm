@@ -1580,7 +1580,7 @@ db " : ten [ four four 1 1 + + + ] literal ; "
 db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
 
 db " : ( )c skip-char ; immediate " ; Skips to )
-db " : \ ten literal skip-char ; immediate " ; Skips to end of line
+db " : \ ten skip-char ; immediate " ; Skips to end of line
 
 db " variable base "
 db " : dec ten base ! ; "

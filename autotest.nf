@@ -1,2 +1,4 @@
-: hw s" Hello" +s" , world! " sys-print ;
-hw
+: hw s" Hello, world! " ;
+: am s" Another message " ;
+\
+hw sys-print am sys-print
