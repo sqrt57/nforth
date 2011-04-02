@@ -1546,41 +1546,34 @@ db " : constant create do-const last-xt @ ! , ; "
 db " : does> do-does last-xt @ ! r> last-xt @ four + ! ; "
 db " : recurse last-xt @ , ; immediate "
 
+db " : ten [ four four 1 1 + + + ] literal ; "
+db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
+db " : pad here [ ten ten * ] literal + ; "
+
 db " : char-from-tib tib >in @ + c@ ; "
 db " : skip-char begin dup char-from-tib = " ; c --
 db      " if drop 1 >in +! exit endif "
 db      " 1 >in +! again ; "
-
-db " : string: create 0 , does> dup four + swap @ ; "
 db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
 db " : [c'] postpone c' postpone literal ; immediate "
-db " : len+! last-xt @ four + four + +! ; " ; u --
-db " : +str swap over here swap cmove dup here + to here " ; addr u --
-db      " len+! ; "
-db " : +c here c! here 1 + to here 1 len+! ; " ; c --
-db " : +c' postpone c' +c ; " ; --
-db ` : +s" 1 >in +! >in @ [c'] " skip-char `
-db      " dup tib + swap >in @ swap - 1 - +str ; "
 
-db " string-buffer value string-here "
-db " 0 value last-string "
-db " : do-string dup four + swap @ ; " ; addr -- addr u
-db " : new-string string-here to last-string "
-db      " lit lit , string-here , ['] do-string , "
-db      " 0 string-here ! "
-db      " string-here four + to string-here ; "
-db " : len+! last-string +! ; " ; u --
-db " : +str swap over string-here swap cmove " ; addr u --
-db      " dup len+! string-here + to string-here ; "
-db ` : +s" 1 >in +! >in @ [c'] " skip-char `
-db      " dup tib + swap >in @ swap - 1 - +str ; immediate "
-db ` : s" new-string postpone +s" ; immediate `
-
-db " : ten [ four four 1 1 + + + ] literal ; "
-db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
+db " variable string-here string-buffer string-here ! "
+; Skips 1 char in tib, scans tib until it finds C
+; updates tib to after C, return address and length of
+; string in tib, not including C
+db " : scan-char " ; c -- addr u
+db      " 1 >in +! >in @ swap skip-char "
+db      " dup tib + swap >in @ swap - 1 - ; "
+db " : string>pad dup >r pad swap cmove pad r> ; "
+db " : string-compile over over "
+db      " string-here @ swap cmove "
+db      " dup string-here +! "
+db      " swap lit lit , , lit lit , , ; "
+db " : store-string state @ if string-compile else string>pad endif ; "
+db ` : " [c'] " scan-char store-string ; immediate `
 
 db " : ( )c skip-char ; immediate " ; Skips to )
-db " : \ ten skip-char ; immediate " ; Skips to end of line
+db " : | ten skip-char ; immediate " ; Skips to end of line
 
 db " variable base "
 db " : dec ten base ! ; "
@@ -1589,7 +1582,6 @@ db " : hex [ ten four 1 1 + + + ] literal base ! ; "
 db " : bin [ 1 1 + ] literal base ! ; "
 db " dec "
 
-db " : pad here [ ten ten * ] literal + ; "
 db " : dig>char dup ten < if 0c + else ten - ac + endif ; " ; u -- c
 db " : u>str begin >r base @ u/mod swap dig>char r@ c! " ; u addr1 -- addr2
 db      " dup 0= if drop r> exit endif r> 1 - again ; "

@@ -1,4 +1,3 @@
-: hw s" Hello, world! " ;
-: am s" Another message " ;
-\
-hw sys-print am sys-print
+" Hello, world!..." sys-print | Prints a string
+: message " Message from a word. " ;
+message sys-print
