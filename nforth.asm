@@ -1572,14 +1572,15 @@ db      " 1 >in +! ; "
 ; Processes special characters
 ; Returns the resulting length as U
 db " : string-process 1 >in +! 0 swap begin " ; addr -- u
-db      ` char-from-tib [c'] " = if 1 >in +! drop exit endif `
+db      ` char-from-tib [c'] " = if `
+db          " 1 >in +!  0 swap c!  exit endif "
 db      " get-char over c! "
 db      " 1 + swap 1 + swap again ; "
 db " : string>pad pad string-process pad swap ; "
 db " : string-compile "
 db      " lit lit , string-here @ , "
 db      " string-here @ string-process "
-db      " dup string-here +! "
+db      " dup 1 + string-here +! "
 db      " lit lit , , ; "
 db ` : " state @ if string-compile else string>pad endif ; immediate `
 
