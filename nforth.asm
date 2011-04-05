@@ -1546,6 +1546,7 @@ db " : constant create do-const last-xt @ ! , ; "
 db " : does> do-does last-xt @ ! r> last-xt @ four + ! ; "
 db " : recurse last-xt @ , ; immediate "
 
+db " : two [ 1 1 + ] literal ; "
 db " : ten [ four four 1 1 + + + ] literal ; "
 db " : twenty-six [ ten ten four 1 1 + + + + ] literal ; "
 db " : pad here [ ten ten * ] literal + ; "
@@ -1556,21 +1557,31 @@ db      " if drop 1 >in +! exit endif "
 db      " 1 >in +! again ; "
 db " : c' tib >in @ + 1 + c@ 1 1 + >in +! ; immediate " ; -- c
 db " : [c'] postpone c' postpone literal ; immediate "
+db " : emit pad c! pad 1 sys-print ; " ; c --
 
 db " variable string-here string-buffer string-here ! "
-; Skips 1 char in tib, scans tib until it finds C
-; updates tib to after C, return address and length of
-; string in tib, not including C
-db " : scan-char " ; c -- addr u
-db      " 1 >in +! >in @ swap skip-char "
-db      " dup tib + swap >in @ swap - 1 - ; "
-db " : string>pad dup >r pad swap cmove pad r> ; "
-db " : string-compile over over "
-db      " string-here @ swap cmove "
+db " : special-char " ; c -- c
+db      " dup [c'] n = if drop ten exit endif ; "
+; Reads 1 or 2 chars from tib, which constitute 1 output char
+; Returns C - output char
+db " : get-char " ; -- c
+db      " char-from-tib dup [c'] \ = if "
+db              " drop 1 >in +! char-from-tib special-char endif "
+db      " 1 >in +! ; "
+; Copies a string terminated by " from tib to ADDR.
+; Processes special characters
+; Returns the resulting length as U
+db " : string-process 1 >in +! 0 swap begin " ; addr -- u
+db      ` char-from-tib [c'] " = if 1 >in +! drop exit endif `
+db      " get-char over c! "
+db      " 1 + swap 1 + swap again ; "
+db " : string>pad pad string-process pad swap ; "
+db " : string-compile "
+db      " lit lit , string-here @ , "
+db      " string-here @ string-process "
 db      " dup string-here +! "
-db      " swap lit lit , , lit lit , , ; "
-db " : store-string state @ if string-compile else string>pad endif ; "
-db ` : " [c'] " scan-char store-string ; immediate `
+db      " lit lit , , ; "
+db ` : " state @ if string-compile else string>pad endif ; immediate `
 
 db " : ( )c skip-char ; immediate " ; Skips to )
 db " : | ten skip-char ; immediate " ; Skips to end of line
