@@ -266,18 +266,6 @@ right_paren_char_entry:
 right_paren_char:
         dd      doconst, 0, ")"
 ;--------------------------------
-true_addr:
-        dd      doconst, 0, true_str_data
-true_len:
-        dd      doconst, 0, true_str_data.end-true_str_data
-false_addr:
-        dd      doconst, 0, false_str_data
-false_len:
-        dd      doconst, 0, false_str_data.end-false_str_data
-prompt_addr:
-        dd      doconst, 0, prompt_str_data
-prompt_len:
-        dd      doconst, 0, prompt_str_data.end-prompt_str_data
 word_not_found_addr:
         dd      doconst, 0, word_not_found_str_data
 word_not_found_len:
@@ -1071,7 +1059,7 @@ sys_open_ro:                    ; addr -- u
 ;--------------------------------
         align   4
 sys_close_entry:
-        dd      true_str_entry  ; Address of next word
+        dd      word_not_found_str_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "sys-close"     ; Word name
@@ -1088,41 +1076,8 @@ sys_close:                      ; u --
 
 ;--------------------------------
         align   4
-true_str_entry:
-        dd      false_str_entry ; Address of next word
-        dd      0               ; Flags
-        dd      .nend - .nst    ; Length of word name
-.nst:   db      "true-str"      ; Word name
-.nend:
-        align   4
-true_str:                       ; -- addr u
-        dd      enter, 0, true_addr, true_len, exit
-;--------------------------------
-        align   4
-false_str_entry:
-        dd      prompt_str_entry        ; Address of next word
-        dd      0               ; Flags
-        dd      .nend - .nst    ; Length of word name
-.nst:   db      "false-str"     ; Word name
-.nend:
-        align   4
-false_str:                      ; -- addr u
-        dd      enter, 0, false_addr, false_len, exit
-;--------------------------------
-        align   4
-prompt_str_entry:
-        dd      word_not_found_str_entry        ; Address of next word
-        dd      0               ; Flags
-        dd      .nend - .nst    ; Length of word name
-.nst:   db      "prompt-str"    ; Word name
-.nend:
-        align   4
-prompt_str:                     ; -- addr u
-        dd      enter, 0, prompt_addr, prompt_len, exit
-;--------------------------------
-        align   4
 word_not_found_str_entry:
-        dd      bool_point_entry        ; Address of next word
+        dd      fill_tib_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "word-not-found-str"    ; Word name
@@ -1130,20 +1085,6 @@ word_not_found_str_entry:
         align   4
 word_not_found_str:             ; -- addr u
         dd      enter, 0, word_not_found_addr, word_not_found_len, exit
-;--------------------------------
-        align   4
-bool_point_entry:
-        dd      fill_tib_entry        ; Address of next word
-        dd      0               ; Flags
-        dd      .nend - .nst    ; Length of word name
-.nst:   db      "b."            ; Word name
-.nend:
-        align   4
-bool_point:                     ; b --
-        ; Prints boolean parameter as "True" or "False"
-        dd      enter, 0, jump_if_not, .else, true_str, sys_print, exit
-.else:
-        dd      false_str, sys_print, exit
 ;--------------------------------
         align   4
 fill_tib_entry:
