@@ -1,7 +1,16 @@
 " core.nf" included
 " asm.nf" included
 
-5 5 = " Must succeed.\n" assert
-3 4 = " Must fail.\n" assert
+: dmp operand-1 @ .
+    operand-1 oper-flag-base oper-flag@ b.
+    operand-1 oper-flag-imm oper-flag@ b.
+    newline ;
 
-" Must not be executed.\n" sys-print
+hex
+dmp
+operand-1 oper-flag-base oper-flag+
+dmp
+operand-1 oper-flag-imm oper-flag+
+dmp
+operand-1 oper-flag-imm oper-flag-
+dmp

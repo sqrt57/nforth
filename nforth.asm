@@ -697,7 +697,7 @@ and:                            ; u1 u2 -- u
 ;--------------------------------
         align   4
 or_entry:
-        dd      zero_equals_entry       ; Address of next word
+        dd      not_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "or"            ; Word name
@@ -707,6 +707,20 @@ or:                             ; u1 u2 -- u
         dd      or+4            ; bit-or
         or edx, [esp]           ; TOS <- U1 or U2
         lea esp, [esp+4]        ; Remove u1 from stack
+        Next
+
+;--------------------------------
+        align   4
+not_entry:
+        dd      zero_equals_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "not"           ; Word name
+.nend:
+        align   4
+not:                            ; u -- u
+        dd      not+4           ; bit-not
+        not edx                 ; TOS <- not TOS
         Next
 
 ;--------------------------------
