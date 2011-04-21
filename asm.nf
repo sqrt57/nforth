@@ -21,4 +21,20 @@ dec
 
 create-operand operand-1
 create-operand operand-2
+defer cur-operand
 
+1 enum{ #eax #ebx #ecx #edx #esp #ebp #esi #edi }enum drop
+
+| : asm ['] operand-1 is cur-operand ;
+| : reg: ( n"--) create , does> @ cur-operand oper-base ! ;
+
+(
+#eax reg: eax
+#ebx reg: ebx
+#ecx reg: ecx
+#edx reg: ecx
+#esp reg: esp
+#ebp reg: ebp
+#esi reg: esi
+#edi reg: edi
+)

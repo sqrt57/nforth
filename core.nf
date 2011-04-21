@@ -5,7 +5,9 @@
 : c, ( c--)  here c! here 1 + to here ;
 : defer-error " Uninitialized deferred word used.\n" type bye ;
 : defer ( "--) create ['] defer-error , does> @ execute ;
-: is ( x"--) ' 8 + ! ;
+: do-is ( xx--) 8 + ! ;
+: is ( x"--) ' do-is ;
+: [is] ( C:"-- R:x--) lit lit , ' , ['] do-is , ; immediate
 : allot ( n--) here + to here ;
 : b. ( b--) if " True " type else " False " type endif ;
 : newline " \n" type ;
@@ -17,7 +19,6 @@
     here last-xt !
     do-var ,  0 , ;
 : }enum ;
-| : enum{ begin get-word find [ " }enum" find ] literal = if exit endif again ;
 : enum{ ( n--n) begin get-word 2dup find [ " }enum" find ] literal = if
     2drop exit else
     add-word  do-const last-xt @ !

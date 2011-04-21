@@ -1,13 +1,17 @@
 " core.nf" included
 " asm.nf" included
 
-" qwerty" add-word 5 ,
+defer message
+: say message type ;
+: hello " Hello!\n" ;
+: goodbye " Goodbye!\n" ;
 
-qwerty @ .
-32 qwerty !
-qwerty @ .
-newline
+' hello is message  say
+message type
+' goodbye is message  say
+message type
 
-1 enum{ a b c }enum . newline
-c . b . a . newline
+: set-message ' [is] message ;
 
+set-message hello  say
+set-message goodbye  say
