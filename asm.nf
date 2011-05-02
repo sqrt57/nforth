@@ -25,16 +25,21 @@ defer cur-operand
 
 1 enum{ #eax #ebx #ecx #edx #esp #ebp #esi #edi }enum drop
 
-| : asm ['] operand-1 is cur-operand ;
-| : reg: ( n"--) create , does> @ cur-operand oper-base ! ;
+| Clears a mmory cell and returns address of next cell
+: clear ( a--a) 0 over ! 4 + ;
+: clear-oper ( a--) clear clear clear clear clear drop ;
 
-(
+| Sets current operand
+: set-oper ( a--) [is] cur-operand  cur-operand clear-oper ;
+: asm: ( "--) ['] operand-1 set-oper create-code ;
+: ,, ( --) ['] operand-2 set-oper ;
+: reg: ( n"--) create , does> @ cur-operand oper-base ! ;
+
 #eax reg: eax
 #ebx reg: ebx
 #ecx reg: ecx
-#edx reg: ecx
+#edx reg: edx
 #esp reg: esp
 #ebp reg: ebp
 #esi reg: esi
 #edi reg: edi
-)
