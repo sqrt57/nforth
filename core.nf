@@ -35,6 +35,7 @@ hex
                   0ff and 2hex. ;
 : safe-emit ( c--) dup 20 7F within if emit else drop " ." type endif ;
 dec
+| Helpers for dumping
 : dh-intro "          " type ;
 : dh-hcell ( a--a) "   " type dup hex. 1 + ;
 : dh-hblk ( a--a) dh-hcell dh-hcell dh-hcell dh-hcell "  " type ;
@@ -60,3 +61,19 @@ dec
     dup 16 <= if 2drop exit endif
     dump-next again ;
 : dump ( au--) over dump-header dump-data ;
+
+| Counted loop
+: do{ ( C:--a; R:u--) here ['] >r , ; immediate
+: }do ( C:a--; R:--)
+    ['] r> ,
+    lit lit ,
+    1 ,
+    ['] - ,
+    ['] dup ,
+    ['] 0= ,
+    do-jump-if-not ,  ,
+    ['] drop , ; immediate
+
+| Cond control statement
+: cond ( C:--n; R:--) 0 ; immediate
+: end-cond ( C:n--; R:--) drop ; immediate
