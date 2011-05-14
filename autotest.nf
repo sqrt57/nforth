@@ -1,22 +1,14 @@
 " core.nf" included
 " asm.nf" included
 
-: test 3 do{ " Hello " type }do ;
-' test 96 dump
-hex
-' r> . " r>\n" type
-' >r . " >r\n" type
-' - . " -\n" type
-' dup . " dup\n" type
-' type . " type\n" type
-' 0= . " 0=\n" type
-' drop . " drop\n" type
-' lit . " lit\n" type
-do-jump-if-not . " do-jump-if-not\n" type
-do-enter . " do-enter\n" type
+: test ( n--) switch{
+    0 case{ " zero " }case
+    1 case{ " one " }case
+    2 case{ " two " }case
+    " unknown "
+    }switch type ;
 
-: test1 4 do{ test newline }do ;
-test1
+0 test  1 test  2 test  3 test 2 test  newline
 
 | asm: my-dup
 

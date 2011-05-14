@@ -74,6 +74,9 @@ dec
     do-jump-if-not ,  ,
     ['] drop , ; immediate
 
-| Cond control statement
-: cond ( C:--n; R:--) 0 ; immediate
-: end-cond ( C:n--; R:--) drop ; immediate
+| Switch control statement
+: switch{ ( C:--n; R:x--) 0 ['] >r , ; immediate
+: }switch ( C:n*an--; R:--) do{ postpone endif }do
+    ['] r> , ['] drop , ; immediate
+: case{ ( C:n--an;R:x--) >r ['] r@ , ['] = , postpone if r> 1 + ; immediate
+: }case ( C:an--an;R:--) >r postpone else r> ; immediate
