@@ -1,15 +1,27 @@
 " core.nf" included
 " asm.nf" included
 
-: test ( n--) switch{
-    0 case{ " zero " }case
-    1 case{ " one " }case
-    2 case{ " two " }case
-    " unknown "
-    }switch type ;
+asm: qwerty
+eax ebx ,, edi
+operand-1 oper>reg-field . .
+operand-2 oper>reg-field . .
+newline
 
-0 test  1 test  2 test  3 test 2 test  newline
+operand-1 oper>mr . .
+operand-2 oper>mr . .
+newline
 
-| asm: my-dup
+asm: asdf
+123 imm ,, 57 imm-32
+operand-1 oper-imm @ .
+operand-1 oper-imm-type @ .
+operand-2 oper-imm @ .
+operand-2 oper-imm-type @ .
+newline
 
-| ' my-dup 64 dump
+dec
+
+asm: zxcv
+eax ,, ebx mov
+ecx ,, edx mov
+' zxcv 16 dump

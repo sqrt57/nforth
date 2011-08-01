@@ -11,6 +11,9 @@
 : allot ( n--) here + to here ;
 : b. ( b--) if " True " type else " False " type endif ;
 : newline " \n" type ;
+-1 constant true
+0 constant false
+
 : add-word ( au--) align
     here  word-list @ ,  word-list !
     0 ,  dup ,  dup >r
@@ -75,8 +78,12 @@ dec
     ['] drop , ; immediate
 
 | Switch control statement
-: switch{ ( C:--n; R:x--) 0 ['] >r , ; immediate
-: }switch ( C:n*an--; R:--) do{ postpone endif }do
-    ['] r> , ['] drop , ; immediate
-: case{ ( C:n--an;R:x--) >r ['] r@ , ['] = , postpone if r> 1 + ; immediate
-: }case ( C:an--an;R:--) >r postpone else r> ; immediate
+: switch{ ( C:--; R:x--) ['] >r , ; immediate
+: }switch ( C:--; R:--) ['] r> , ['] drop , ; immediate
+: case{ ( C:--a;R:x--) ['] r@ , ['] = , postpone if ; immediate
+: }case ( C:a--;R:--) ['] r> , ['] drop , ['] exit , postpone endif ;
+    immediate
+
+| Cond control structure
+: cond{ ( C:--a; R:b--) postpone if ; immediate
+: }cond ( C:a--; R:--) ['] exit , postpone endif ; immediate

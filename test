@@ -1,6 +1,0 @@
-#!/bin/bash
-
-make && ./nforth
-
-echo Exit status: $?
-
