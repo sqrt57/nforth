@@ -1,0 +1,5 @@
+/nforth
+/build/
+*.o
+*.lst
+.scons*
