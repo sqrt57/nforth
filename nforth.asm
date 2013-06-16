@@ -39,29 +39,33 @@
 ;
 ; XX = align(12 + Name length), aligned to 4-byte boundary
 
-        dict_len        equ     64*1024
-        input_buf_len   equ     64*1024
-        string_buf_len  equ     8*1024
-        pstack_depth    equ     256
-        rstack_depth    equ     128
+format ELF executable 3
+
+        dict_len        =       64*1024
+        input_buf_len   =       64*1024
+        string_buf_len  =       8*1024
+        pstack_depth    =       256
+        rstack_depth    =       128
 
 ;--------------------------------
 ; Direct threaded code interpreter
-%macro  Next 0
+;--------------------------------
+macro Next
+{
 
         mov eax, [esi]          ; Get next word address from thread
         lea esi, [esi+4]        ; Adjust IP
         mov edi, [eax]          ; X now points to machine code of next word
         jmp edi                 ; Jump to word machine code
 
-%endmacro
+}
 
 ;--------------------------------
-section .data
+segment readable writeable
 ;--------------------------------
         align   4
 here_entry:
-        dd      tib_entry     ; Address of next word
+        dd      tib_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "here"          ; Word name
@@ -286,7 +290,7 @@ right_paren_char:
 word_not_found_addr:
         dd      doconst, 0, word_not_found_str_data
 word_not_found_len:
-        dd      doconst, 0,
+        dd      doconst, 0
         dd      word_not_found_str_data.end-word_not_found_str_data
 ;--------------------------------
 true_str_data:
@@ -305,27 +309,26 @@ word_not_found_str_data:
         align   4
 
 ;--------------------------------
-section .bss
+segment writeable
 ;--------------------------------
-        alignb  4
+        align 4
 dictionary_start_addr:
-        resb    dict_len
-        alignb  4
-        resd    pstack_depth
+        rb      dict_len
+        align   4
+        rd      pstack_depth
 pstack_bottom:
 tib_addr:
-        resb    input_buf_len
-        alignb  4
-        resd    rstack_depth
+        rb      input_buf_len
+        align   4
+        rd      rstack_depth
 rstack_bottom:
 string_buf:
-        resb    string_buf_len
+        rb      string_buf_len
 ;--------------------------------
-section .text
+segment readable executable
 ;--------------------------------
-        global _start
-
-_start:
+entry   start
+start:
         nop                     ; Makes gdb happy
 
         cld
@@ -349,8 +352,8 @@ enter_entry:
 .nst:   db      "do-enter"      ; Word name
 .nend:
         align   4
-        dd      doconst, 0, enter
-enter:
+        dd      doconst, 0, do_enter
+do_enter:
         lea ebp, [ebp-4]        ; Add one cell on top of return stack
         mov [ebp], esi          ; Push IP on return stack
         lea esi, [eax+8]        ; Set IP to the parameter field
@@ -397,7 +400,7 @@ doval_entry:
 .nend:
         align   4
         dd      doconst, 0, doval
-doval   equ     doconst
+doval = doconst
 ;--------------------------------
         align   4
 dodoes_entry:
@@ -467,8 +470,8 @@ dup_entry:
 .nst:   db      "dup"           ; Word name
 .nend:
         align   4
-dup:                            ; x -- x x
-        dd      dup+4
+dup_:                            ; x -- x x
+        dd      dup_+4
         push edx                ; Push a copy of TOS on the stack
         Next
 
@@ -589,8 +592,8 @@ store_entry:
 .nst:   db      "!"             ; Word name
 .nend:
         align   4
-store:                          ; x addr --
-        dd      store+4         ; Code field
+store_:                          ; x addr --
+        dd      store_+4         ; Code field
         pop ebx                 ; Get X value
         mov [edx], ebx          ; Store X at ADDR
         pop edx                 ; Get new TOS
@@ -705,8 +708,8 @@ and_entry:
 .nst:   db      "and"           ; Word name
 .nend:
         align   4
-and:                            ; u1 u2 -- u
-        dd      and+4           ; bit-and
+and_:                           ; u1 u2 -- u
+        dd      and_+4          ; bit-and
         and edx, [esp]          ; TOS <- U1 and U2
         lea esp, [esp+4]        ; Remove u1 from stack
         Next
@@ -720,8 +723,8 @@ or_entry:
 .nst:   db      "or"            ; Word name
 .nend:
         align   4
-or:                             ; u1 u2 -- u
-        dd      or+4            ; bit-or
+or_:                            ; u1 u2 -- u
+        dd      or_+4           ; bit-or
         or edx, [esp]           ; TOS <- U1 or U2
         lea esp, [esp+4]        ; Remove u1 from stack
         Next
@@ -735,8 +738,8 @@ not_entry:
 .nst:   db      "not"           ; Word name
 .nend:
         align   4
-not:                            ; u -- u
-        dd      not+4           ; bit-not
+not_:                           ; u -- u
+        dd      not_+4          ; bit-not
         not edx                 ; TOS <- not TOS
         Next
 
@@ -1050,7 +1053,7 @@ sys_read_stdin_entry:
 .nend:
         align   4
 sys_read_stdin:                 ; addr u -- u1
-        dd      enter, 0, lit, 0, sys_read, exit
+        dd      do_enter, 0, lit, 0, sys_read, exit
 
 ;--------------------------------
         align   4
@@ -1115,7 +1118,7 @@ word_not_found_str_entry:
 .nend:
         align   4
 word_not_found_str:             ; -- addr u
-        dd      enter, 0, word_not_found_addr, word_not_found_len, exit
+        dd      do_enter, 0, word_not_found_addr, word_not_found_len, exit
 ;--------------------------------
         align   4
 fill_tib_entry:
@@ -1126,8 +1129,8 @@ fill_tib_entry:
 .nend:
         align   4
 fill_tib:                     ; --
-        dd      enter, 0, tib, tib_length, sys_read_stdin
-        dd      number_tib, store, lit, 0, to_in, store, exit
+        dd      do_enter, 0, tib, tib_length, sys_read_stdin
+        dd      number_tib, store_, lit, 0, to_in, store_, exit
 ;--------------------------------
         align   4
 within_entry:
@@ -1139,8 +1142,8 @@ within_entry:
         align   4
 within:                         ; n1 n2 n3 -- b
         ; Returns true iff n2 <= n1 < n3, comparison is signed
-        dd      enter, 0, rot, swap, over, greater_than,
-        dd      rot, rot, less_or_equal, and, exit
+        dd      do_enter, 0, rot, swap, over, greater_than
+        dd      rot, rot, less_or_equal, and_, exit
 ;--------------------------------
         align   4
 plus_store_entry:
@@ -1151,7 +1154,7 @@ plus_store_entry:
 .nend:
         align   4
 plus_store:                     ; u/n addr --
-        dd      enter, 0, dup, fetch, rot, plus, swap, store, exit
+        dd      do_enter, 0, dup_, fetch, rot, plus, swap, store_, exit
 ;--------------------------------
         align   4
 white_q_entry:
@@ -1165,8 +1168,8 @@ white_q:                        ; c -- b
         ; We consider 09-0d, 20 as whitespace
         ; (horizontal tab, line feed, vertical tab, form feed,
         ;  carriage return, space)
-        dd      enter, 0, dup, lit, 09h, lit, 0eh, within
-        dd      swap, lit, 20h, equals, or, exit
+        dd      do_enter, 0, dup_, lit, 09h, lit, 0eh, within
+        dd      swap, lit, 20h, equals, or_, exit
 ;--------------------------------
         align   4
 inside_tib_entry:
@@ -1177,7 +1180,7 @@ inside_tib_entry:
 .nend:
         align   4
 inside_tib:                   ; -- b
-        dd      enter, 0, to_in, fetch, number_tib, fetch, less_than,
+        dd      do_enter, 0, to_in, fetch, number_tib, fetch, less_than
         dd      exit
 ;--------------------------------
         align   4
@@ -1190,10 +1193,10 @@ drop_white_entry:
         align   4
 drop_white:                     ; --
         ; Adjusts >IN to the first non-whitespace character
-        dd      enter, 0
-.iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q,
-        dd      jump_if_not, .end,
-        dd      inside_tib, jump_if_not, .end,
+        dd      do_enter, 0
+.iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q
+        dd      jump_if_not, .end
+        dd      inside_tib, jump_if_not, .end
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      exit
 ;--------------------------------
@@ -1209,11 +1212,11 @@ get_word:                       ; -- addr u
         ; Reads a word from TIB starting at >IN
         ; Skips leading whitespace
         ; If end of TIB is reached returns length 0
-        dd      enter, 0, drop_white, tib, to_in, fetch, plus
+        dd      do_enter, 0, drop_white, tib, to_in, fetch, plus
         dd      to_in, fetch
 .iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q, zero_equals
         dd      jump_if_not, .end
-        dd      inside_tib, jump_if_not, .end,
+        dd      inside_tib, jump_if_not, .end
         dd      lit, 1, to_in, plus_store, jump, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
 ;--------------------------------
@@ -1225,10 +1228,10 @@ cmove_entry:
 .nst:   db      "cmove"         ; Word name
 .nend:
         align   4
-cmove:                          ; c-addr1 c-addr2 u --
+cmove_:                         ; c-addr1 c-addr2 u --
         ; Copy U characters starting from C-ADDR1 to C-ADDR2
-        dd      enter, 0
-.iter:  dd      dup, lit, 0, greater_than, jump_if_not, .end
+        dd      do_enter, 0
+.iter:  dd      dup_, lit, 0, greater_than, jump_if_not, .end
         dd      rot, rot, over, c_fetch, over, c_store
         dd      lit, 1, plus, swap, lit, 1, plus, swap, rot
         dd      lit, 1, minus, jump, .iter
@@ -1245,8 +1248,8 @@ chars_equals_entry:
         align   4
 chars_equals:                   ; c-addr1 c-addr2 u -- b
         ; Compares two strings with the same length for equality
-        dd      enter, 0, to_r
-.iter:  dd      r_to, dup, jump_if_not, .exit
+        dd      do_enter, 0, to_r
+.iter:  dd      r_to, dup_, jump_if_not, .exit
         dd      lit, 1, minus, to_r
         dd      over, c_fetch, over, c_fetch, equals
         dd      rot, lit, 1, plus, rot, lit, 1, plus, rot
@@ -1264,7 +1267,7 @@ str_equals_entry:
         align   4
 str_equals:                     ; c-addr1 u1 c-addr2 u2 -- b
         ; Compares two strings for equality
-        dd      enter, 0, rot, over, equals, jump_if_not, .diff_length
+        dd      do_enter, 0, rot, over, equals, jump_if_not, .diff_length
         dd      chars_equals, exit
 .diff_length:
         dd      drop, drop, drop, lit, 0, exit
@@ -1280,8 +1283,8 @@ str_to_dict_entry:
 str_to_dict:                    ; c-addr u -- c-addr u
         ; Copies string (c-addr,u) to dictionary adjusting here pointer
         ; and returns pointer to stored string
-        dd      enter, 0
-        dd      to_r, here, r_fetch, cmove
+        dd      do_enter, 0
+        dd      to_r, here, r_fetch, cmove_
         dd      here, r_fetch, here, r_to, plus, to_val, here, exit
 ;--------------------------------
         align   4
@@ -1293,12 +1296,12 @@ find_entry:
 .nend:
         align   4
 find:                           ; c-addr u -- addr
-        dd      enter, 0, word_list, fetch, to_r, jump, .start
+        dd      do_enter, 0, word_list, fetch, to_r, jump, .start
 .iter:
         dd      r_to, fetch, to_r
 .start:
         dd      r_fetch, jump_if_not, .end
-        dd      over, over, r_fetch, lit, 12, plus,
+        dd      over, over, r_fetch, lit, 12, plus
         dd      r_fetch, lit, 8, plus, fetch, str_equals
         dd      jump_if_not, .iter
         dd      drop, drop, r_to, exit
@@ -1314,7 +1317,7 @@ aligned_entry:
 .nend:
         align   4
 aligned:                        ; addr -- a-addr
-        dd      enter, 0, lit, 3, plus, lit, 2, rshift
+        dd      do_enter, 0, lit, 3, plus, lit, 2, rshift
         dd      lit, 2, lshift, exit
 ;--------------------------------
         align   4
@@ -1326,7 +1329,7 @@ align_entry:
 .nend:
         align   4
 align_here:                     ; --
-        dd      enter, 0, here, aligned, to_val, here, exit
+        dd      do_enter, 0, here, aligned, to_val, here, exit
 ;--------------------------------
         align   4
 to_body_entry:
@@ -1337,7 +1340,7 @@ to_body_entry:
 .nend:
         align   4
 to_body:
-        dd      enter, 0, dup, lit, 8, plus, fetch
+        dd      do_enter, 0, dup_, lit, 8, plus, fetch
         dd      plus, lit, 12, plus, aligned, exit
 ;--------------------------------
         align   4
@@ -1350,7 +1353,7 @@ left_bracket_entry:
         align   4
 left_barcket:                   ; -- (immediate)
         ; Changes state to interpret
-        dd      enter, 0, lit, 0, state, store, exit
+        dd      do_enter, 0, lit, 0, state, store_, exit
 ;--------------------------------
         align   4
 right_bracket_entry:
@@ -1362,7 +1365,7 @@ right_bracket_entry:
         align   4
 right_bracket:
         ; Changes state to compile
-        dd      enter, 0, lit, -1, state, store, exit
+        dd      do_enter, 0, lit, -1, state, store_, exit
 ;--------------------------------
         align   4
 eval_word_entry:
@@ -1375,9 +1378,9 @@ eval_word_entry:
 eval_word:                      ; i*x addr -- j*x
         ; Interprets or compiles a word according to system state
         ; and immediate flag of the word
-        dd      enter, 0
+        dd      do_enter, 0
         dd      state, fetch, jump_if_not, .exec
-        dd      dup, lit, 4, plus, fetch, zero_equals, jump_if_not, .exec
+        dd      dup_, lit, 4, plus, fetch, zero_equals, jump_if_not, .exec
         dd      to_body, comma, exit
 .exec:  dd      to_body, execute, exit
 ;--------------------------------
@@ -1390,7 +1393,7 @@ comma_entry:
 .nend:
         align   4
 comma:                          ; x --
-        dd      enter, 0, here, store
+        dd      do_enter, 0, here, store_
         dd      here, lit, 4, plus, to_val, here, exit
 ;--------------------------------
         align   4
@@ -1402,17 +1405,17 @@ create_entry:
 .nend:
         align   4
 create:                         ; "word" --
-        dd      enter, 0,
-        dd      get_word, dup, jump_if_not, .exit
+        dd      do_enter, 0
+        dd      get_word, dup_, jump_if_not, .exit
         dd      here, aligned, to_val, here
         dd      here, to_r
         dd      word_list, fetch, comma
-        dd      r_to, word_list, store
+        dd      r_to, word_list, store_
         dd      lit, 0, comma
-        dd      dup, comma, dup, to_r
-        dd      here, swap, cmove
-        dd      r_to, here, plus, aligned, to_val, here,
-        dd      here, last_xt, store
+        dd      dup_, comma, dup_, to_r
+        dd      here, swap, cmove_
+        dd      r_to, here, plus, aligned, to_val, here
+        dd      here, last_xt, store_
         dd      lit, dovar, comma, lit, 0, comma, exit
 .exit:  dd      drop, drop, exit
 ;--------------------------------
@@ -1425,7 +1428,7 @@ zero_entry:
 .nend:
         align   4
 zero:                           ; -- u
-        dd      enter, 0, lit, 0, exit
+        dd      do_enter, 0, lit, 0, exit
 ;--------------------------------
         align   4
 one_entry:
@@ -1436,7 +1439,7 @@ one_entry:
 .nend:
         align   4
 one:                            ; -- u
-        dd      enter, 0, lit, 1, exit
+        dd      do_enter, 0, lit, 1, exit
 ;--------------------------------
         align   4
 four_entry:
@@ -1447,7 +1450,7 @@ four_entry:
 .nend:
         align   4
 four:                           ; -- u
-        dd      enter, 0, lit, 4, exit
+        dd      do_enter, 0, lit, 4, exit
 ;--------------------------------
         align   4
 rep_loop_entry:
@@ -1458,10 +1461,10 @@ rep_loop_entry:
 .nend:
         align   4
 rep_loop:
-        dd      enter, 0
-.iter:  dd      get_word, dup, jump_if_not, .end
+        dd      do_enter, 0
+.iter:  dd      get_word, dup_, jump_if_not, .end
         dd      over, over
-        dd      find, dup, jump_if_not, .err
+        dd      find, dup_, jump_if_not, .err
         dd      swap, drop, swap, drop
         dd      eval_word, jump, .iter
 .err:   dd      drop, sys_print, word_not_found_str, sys_print, sys_exit
@@ -1477,10 +1480,10 @@ main_entry:
 .nend:
         align   4
 main:
-        dd      enter, 0
+        dd      do_enter, 0
         dd      lit, bootstrap_str, to_val, tib
-        dd      lit, bootstrap_length, number_tib, store
-        dd      lit, 0, to_in, store
+        dd      lit, bootstrap_length, number_tib, store_
+        dd      lit, 0, to_in, store_
         dd      rep_loop
 
 ;--------------------------------
@@ -1488,7 +1491,7 @@ start_ip:
         dd      main
 
 ;--------------------------------
-bootstrap_length equ bootstrap_str.end - bootstrap_str
+bootstrap_length = bootstrap_str.end - bootstrap_str
 bootstrap_str:
 
 db " create create-exec ] create do-enter last-xt @ ! exit [ "
@@ -1544,7 +1547,7 @@ db      " 1 >in +! ; "
 ; Processes special characters
 ; Returns the resulting length as U
 db " : string-process 1 >in +! 0 swap begin " ; addr -- u
-db      ` char-from-tib [c'] " = if `
+db      " char-from-tib [c'] "" = if "
 db          " 1 >in +!  0 swap c!  exit endif "
 db      " get-char over c! "
 db      " 1 + swap 1 + swap again ; "
@@ -1554,7 +1557,7 @@ db      " lit lit , string-here @ , "
 db      " string-here @ string-process "
 db      " dup 1 + string-here +! "
 db      " lit lit , , ; "
-db ` : " state @ if string-compile else string>pad endif ; immediate `
+db " : "" state @ if string-compile else string>pad endif ; immediate "
 
 db " : ( )c skip-char ; immediate " ; Skips to )
 db " : | ten skip-char ; immediate " ; Skips to end of line
