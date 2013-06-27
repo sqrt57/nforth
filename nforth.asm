@@ -39,7 +39,9 @@
 ;
 ; XX = align(12 + Name length), aligned to 4-byte boundary
 
-format ELF executable 3
+PLATFORM_HEADER
+
+PLATFORM_EXTRA
 
         dict_len        =       64*1024
         input_buf_len   =       64*1024
@@ -61,7 +63,7 @@ macro Next
 }
 
 ;--------------------------------
-segment readable writeable
+PLATFORM_SECTION_DATA
 ;--------------------------------
         align   4
 here_entry:
@@ -205,8 +207,9 @@ argc_entry:
 .nst:   db      "argc"          ; Word name
 .nend:
         align   4
-argc:
-        dd      doval, 0, 0
+argc_xt:
+        dd      doval, 0
+argc    dd      0
 
 ;--------------------------------
         align   4
@@ -217,8 +220,9 @@ argv_entry:
 .nst:   db      "argv"          ; Word name
 .nend:
         align   4
-argv:
-        dd      doval, 0, 0
+argv_xt:
+        dd      doval, 0
+argv    dd      0
 
 ;--------------------------------
         align   4
@@ -278,7 +282,7 @@ minus_char:
 ;--------------------------------
         align   4
 right_paren_char_entry:
-        dd      enter_entry     ; Address of next word
+        dd      stdin_entry     ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      ")c"
@@ -286,6 +290,18 @@ right_paren_char_entry:
         align   4
 right_paren_char:
         dd      doconst, 0, ")"
+;--------------------------------
+        align   4
+stdin_entry:
+        dd      enter_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "stdin"
+.nend:
+        align   4
+stdin_xt:
+        dd      doconst, 0
+stdin   dd      0
 ;--------------------------------
 word_not_found_addr:
         dd      doconst, 0, word_not_found_str_data
@@ -309,7 +325,7 @@ word_not_found_str_data:
         align   4
 
 ;--------------------------------
-segment writeable
+PLATFORM_SECTION_BSS
 ;--------------------------------
         align 4
 dictionary_start_addr:
@@ -325,17 +341,10 @@ rstack_bottom:
 string_buf:
         rb      string_buf_len
 ;--------------------------------
-segment readable executable
+PLATFORM_SECTION_CODE
 ;--------------------------------
-entry   start
 start:
-        nop                     ; Makes gdb happy
-
         cld
-        mov [argc+8], esp       ; Store pointer to
-                                ; command line arguments count
-                                ; in argc variable
-        mov eax, [esp]
         mov esi, start_ip       ; Initialize IP
         mov ebp, rstack_bottom  ; Initialize RSP
         mov esp, pstack_bottom  ; Initialize PSP
@@ -1015,18 +1024,13 @@ sys_print_entry:
         align   4
 sys_print:                      ; addr u --
         dd      sys_print+4     ; Code field
-                                ; String length is already in edx (TOS)
-        mov eax, 4              ; sys_write
-        mov ebx, 1              ; Standard output
-        pop ecx                 ; Address of string
-        int 80h                 ; Make syscall
-        pop edx                 ; Get new TOS
-        Next                ; End of code
+        PLATFORM_SYS_PRINT
+        Next                    ; End of code
 
 ;--------------------------------
         align   4
 sys_read_entry:
-        dd      sys_exit_entry  ; Address of next word
+        dd      sys_read_stdin_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "sys-read"      ; Word name
@@ -1034,15 +1038,9 @@ sys_read_entry:
         align   4
 sys_read:                       ; addr u1 file-handle -- u3
         dd      sys_read+4
-        ; (buffer address) (buffer length) (file handle)
-        ; -- (bytes read)
-        mov eax, 3              ; sys_read
-        mov ebx, edx            ; File handle
-        pop edx                 ; Number of bytes to read from U1
-        pop ecx                 ; Pop ADDR of buffer
-        int 80h                 ; Make syscall
-        mov edx, eax            ; Get new TOS
+        PLATFORM_SYS_READ
         Next
+
 ;--------------------------------
         align   4
 sys_read_stdin_entry:
@@ -1053,7 +1051,7 @@ sys_read_stdin_entry:
 .nend:
         align   4
 sys_read_stdin:                 ; addr u -- u1
-        dd      do_enter, 0, lit, 0, sys_read, exit
+        dd      do_enter, 0, stdin_xt, sys_read, exit
 
 ;--------------------------------
         align   4
@@ -1064,11 +1062,9 @@ sys_exit_entry:
 .nst:   db      "sys-exit"      ; Word name
 .nend:
         align   4
-sys_exit:                       ; --
+sys_exit:                       ; u --
         dd      sys_exit+4      ; Code field
-        mov eax, 1              ; sys_exit
-        mov ebx, 0              ; Return code 0 - success
-        int 80h                 ; Make syscall
+        PLATFORM_SYS_EXIT
 
 ;--------------------------------
         align   4
@@ -1083,11 +1079,7 @@ sys_open_ro:                    ; addr -- u
         ; Opens file with name addr (null-terminated string)
         ; and returns file handle
         dd      sys_open_ro+4   ; Code field
-        mov eax, 5              ; sys_open
-        mov ebx, edx            ; Address of filename from tOS
-        mov ecx, 0              ; O_RDONLY
-        int 80h                 ; Make syscall
-        mov edx, eax            ; Store result handler in TOS
+        PLATFORM_SYS_OPEN_RO
         Next
 
 ;--------------------------------
@@ -1102,10 +1094,7 @@ sys_close_entry:
 sys_close:                      ; u --
         ; Closes file handle
         dd      sys_close+4     ; Code field
-        mov eax, 6              ; sys_close
-        mov ebx, edx            ; Get file handle from TOS
-        int 80h                 ; Make syscall
-        pop edx                 ; Pop new TOS from stack
+        PLATFORM_SYS_CLOSE
         Next
 
 ;--------------------------------
@@ -1467,7 +1456,8 @@ rep_loop:
         dd      find, dup_, jump_if_not, .err
         dd      swap, drop, swap, drop
         dd      eval_word, jump, .iter
-.err:   dd      drop, sys_print, word_not_found_str, sys_print, sys_exit
+.err:   dd      drop, sys_print, word_not_found_str, sys_print
+        dd      lit, 1, sys_exit
         dd      jump, .iter
 .end:   dd      drop, drop, exit
 ;--------------------------------
@@ -1502,7 +1492,7 @@ db " create-exec ; ] lit exit , postpone [ exit [ immediate "
 db " create-exec : ] create-exec ] exit [ "
 
 db " : nip swap drop ; "
-db " : bye sys-exit ; "
+db " : bye 0 sys-exit ; "
 
 db " : if do-jump-if-not , here 0 , ; immediate "
 db " : else do-jump , here 0 , swap here swap ! ; immediate "
@@ -1598,9 +1588,6 @@ db              " dup 1 = if drop drop 0 0 exit endif "
 db              " 1 - swap 1 + swap str>uint swap negate swap exit endif "
 db      " str>uint ; "
 
-db " : init argc four + to argv ; "     ; to doesn't work outside of
-db " init "                             ; word definition
-
 ; Given a pointer to a null-terminated string
 ; returns its length
 db " : length 0 begin "                 ; addr -- u
@@ -1614,7 +1601,7 @@ db      " get-word dup 0= if drop drop exit endif "
 db      " over over find dup if nip nip eval-word else "
 db              " drop over over str>int if nip nip eval-int else "
 db                      " drop sys-print word-not-found-str sys-print "
-db                      " sys-exit "
+db                      " 1 sys-exit "
 db      " endif endif again ; "
 
 db " : update-tib-length input-buffer input-buffer-length + "
@@ -1642,7 +1629,7 @@ db " : for-each-arg argv begin four + " ; xt --
 db      " dup @ 0 = if drop drop exit endif "
 db      " over over @ swap execute again ; "
 db " : exec-args ['] exec-file for-each-arg ; "
-db " : exec-stdin begin 0 read-to-tib 0= if exit endif "
+db " : exec-stdin begin stdin read-to-tib 0= if exit endif "
 db      " eval-loop again ; "
 db " : main init-tib exec-args exec-stdin bye ; "
 
