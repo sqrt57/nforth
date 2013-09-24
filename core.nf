@@ -1,4 +1,4 @@
-| Copyright 2010-2012 Dmitry Grigoryev
+| Copyright 2010-2013 Dmitry Grigoryev
 |
 | This file is part of Nforth.
 |
@@ -19,7 +19,8 @@
 : 2drop drop drop ;
 : type ( au--) sys-print ;
 : assert ( bau--) rot if drop drop else type bye endif ;
-: c, ( c--)  here c! here 1 + to here ;
+: c, ( c--)  here c!  here 1 +  to here ;
+: w, ( w--)  here w!  here 2 +  to here ;
 : defer-error " Uninitialized deferred word used.\n" type bye ;
 : defer ( "--) create ['] defer-error , does> @ execute ;
 : do-is ( xx--) 8 + ! ;

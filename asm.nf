@@ -1,4 +1,4 @@
-| Copyright 2010-2012 Dmitry Grigoryev
+| Copyright 2010-2013 Dmitry Grigoryev
 |
 | This file is part of Nforth.
 |
@@ -15,72 +15,76 @@
 | You should have received a copy of the GNU Affero General Public License
 | along with Nforth.  If not, see <http://www.gnu.org/licenses/>.
 
-| --- List of operand types
-1 constant reg
-2 constant m/r
-3 constant m/r+sib
-4 constant immed
+hex
+
+| --- Defining words
+: create-code ( "--) create here 4 - to here here last-xt @ ! ;
+
+| --- Variables  for holding parts of opcode
+variable op-reg
+variable op-mod
+variable op-r/m
+variable op-sib
+variable op-sib?
+variable op-disp
+variable op-disp-size
+variable op-immed
+variable op-immed-size
 
 | --- Register codes
-0 constant #eax
-1 constant #ecx
-2 constant #edx
-3 constant #ebx
-4 constant #esp
-5 constant #ebp
-6 constant #esi
-7 constant #edi
+: eax 0 ;
+: ecx 1 ;
+: edx 2 ;
+: ebx 3 ;
+: esp 4 ;
+: ebp 5 ;
+: esi 6 ;
+: edi 7 ;
 
-| --- Parser state
-defer do-reg
-defer do-const
+| --- Helper words
+| -- ModR/M-byte
+: mod-rm ( --c) op-r/m @  op-reg @ 3 lshift +  op-mod @ 6 lshift + ;
+| -- SIB-byte
+: sib ( ccc-c) swap 3 lshift +  swap 6 lshift + ;
+: sib, ( ---) op-sib? @ if op-sib @ c, endif ;
+: disp, ( ---) op-disp-size @
+    dup 1 = if op-disp @ c, endif
+    dup 2 = if op-disp @ w, endif
+        3 = if op-disp @ , endif ;
+: rest,  mod-rm c, sib, disp, ;
 
-| --- mem data
-create regs  16 allot  | reg1 scale1 reg2 scale2
-variable >op
-variable immed
-variable immed-size
-: regs-check  ( --) >op @ 16 >= if
-    " Too many registers in memory reference.\n" type bye endif ;
-: 8aligned ( n--n) 7 +  3 rshift  3 lshift ;
-: reg-check ( --) >op @ 8aligned >op !  regs-check ;
-: scale-check ( --) >op @ 8 /mod drop 0 = if
-    " Scale specified but no register found.\n" type bye endif ;
-: op ( n--) regs >op @ + ;
-: op, ( n--) op !  4 >op +! ;
-: op# ( n--a) 3 lshift  regs + ;
-| - Public words
-: mem-reg, ( n--) reg-check  op,  0 op ! ;
-: scale, ( n--) scale-check  op, ;
-: regs-reset ( --) 0 >op ! ;
-: regs-num ( --n) >op @  7 +  3 rshift ;
-: mem-reg@ ( n--n) op# @ ;
-: scale@ ( n--n) op# 4 + @ ;
+| All register words have the same signature
+| ---
+| Where SIB? is a boolean indicating the need for SIB in opcode
+: [eax] 0 op-mod !  0 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
+: [ecx] 0 op-mod !  1 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
+: [edx] 0 op-mod !  2 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
+: [ebx] 0 op-mod !  3 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
+: [esp] 0 op-mod !  4 op-r/m !  -1 op-sib? !  24 op-sib !  0 op-disp-size ! ;
+: [ebp] 1 op-mod !  5 op-r/m !  0 op-sib? !  1 op-disp-size !  0 op-disp ! ;
+: [esi] 0 op-mod !  6 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
+: [edi] 0 op-mod !  7 op-r/m !  0 op-sib? !  0 op-disp-size ! ;
 
-| --- Operands
-| - Public
-: type ( --a) ;
-: modrm ( --a) ;
-: sib ( --a) ;
-: immed ( --a) ;
-: immed-size ( --a) ;
-: operand-size ( --a) ;
-: ops-reset ( --) ;
-: ops-append ( --) ;
-: ops-next ( --) ;
-: ops# ( --n) ;
-
-| --- m/r writer
-
-| --- reg writer
-: rcheck ( n--) drop ;
-| - Public
-: reg, ( n--) ops-append  dup rcheck
-    3 lshift modrm !  reg type ! ;
-
-| --- Register list
-
-| --- Operand matchers
+| disp8 --
+: [b+eax] op-disp !  1 op-mod !  0 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+ecx] op-disp !  1 op-mod !  1 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+edx] op-disp !  1 op-mod !  2 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+ebx] op-disp !  1 op-mod !  3 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+esp] op-disp !  1 op-mod !  4 op-r/m !  -1 op-sib? !  24 op-sib !
+    1 op-disp-size ! ;
+: [b+ebp] op-disp !  1 op-mod !  5 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+esi] op-disp !  1 op-mod !  6 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
+: [b+edi] op-disp !  1 op-mod !  7 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
 
 | --- Instructions
-
+| --
+: pushd-reg ( c--) 50 + c, ;
+| --
+: movd-reg-mem ( c--) op-reg !  8b c,  rest, ;
+: movd-reg-reg ( cc--) op-r/m !  op-reg !  3 op-mod !  0 op-sib? !
+    0 op-disp-size !  8b c,  rest, ;
+: movd-mem-reg ( c--) op-reg !  89 c,  rest, ;
+: lea ( c--) op-reg !  8d c,  rest, ;
+: jmp-near-mem ( --)  4 op-reg !  ff c,  rest, ;
+: jmp-near-reg ( c--)  op-r/m !  3 op-mod !  0 op-sib? !  0 op-disp-size !
+    4 op-reg !  ff c,  rest, ;

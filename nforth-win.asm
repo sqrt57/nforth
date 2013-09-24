@@ -189,7 +189,7 @@ macro PLATFORM_SYS_READ
         pop eax                 ; Pop maximum buffer length
         
         ; There is some bug when trying to read from stdin
-        ; to buffer with size of 32KBytes. In this case
+        ; to buffer of size greater than 32KBytes. In this case
         ; we limit buffer size to 32KBytes
         cmp edx, [hStdin]       ; Compare file handle to standard input
         jne fixed               ; If it's not then Ok
@@ -219,7 +219,7 @@ macro PLATFORM_SYS_READ_STDIN
         local fixed
 
         ; There is some bug when trying to read from stdin
-        ; to buffer with size of 32KBytes. In this case
+        ; to buffer of size greater than 32KBytes. In this case
         ; we limit buffer size to 32KBytes
         cmp edx, 16*1024        ; Compare buffer size to 16 KBytes
         jl fixed                ; If less then Ok

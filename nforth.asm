@@ -1,4 +1,4 @@
-; Copyright 2010-2012 Dmitry Grigoryev
+; Copyright 2010-2013 Dmitry Grigoryev
 ;
 ; This file is part of Nforth.
 ;
@@ -617,7 +617,7 @@ c_fetch_entry:
 .nst:   db      "c@"            ; Word name
 .nend:
         align   4
-c_fetch:                        ; addr -- c
+c_fetch:                        ; addr -- char
         dd      c_fetch+4       ; Code field
         movzx edx, byte [edx]   ; Get C from ADDR
         Next                    ; Include interpreter
@@ -625,16 +625,46 @@ c_fetch:                        ; addr -- c
 ;--------------------------------
         align   4
 c_store_entry:
-        dd      lit_entry       ; Address of next word
+        dd      w_fetch_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "c!"            ; Word name
 .nend:
         align   4
-c_store:                        ; char c-addr --
+c_store:                        ; char addr --
         dd      c_store+4       ; Code field
-        pop ebx                 ; Get C value
-        mov byte [edx], bl      ; Store C at ADDR
+        pop ebx                 ; Get CHAR value
+        mov byte [edx], bl      ; Store CHAR at ADDR
+        pop edx                 ; Get new TOS
+        Next                    ; Include interpreter
+        
+;--------------------------------
+        align   4
+w_fetch_entry:
+        dd      w_store_entry   ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "w@"            ; Word name
+.nend:
+        align   4
+w_fetch:                        ; addr -- word
+        dd      w_fetch+4       ; Code field
+        movzx edx, word [edx]   ; Get WORD from ADDR
+        Next                    ; Include interpreter
+
+;--------------------------------
+        align   4
+w_store_entry:
+        dd      lit_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "w!"            ; Word name
+.nend:
+        align   4
+w_store:                        ; word addr --
+        dd      w_store+4       ; Code field
+        pop ebx                 ; Get WORD value
+        mov word [edx], bx      ; Store WORD at ADDR
         pop edx                 ; Get new TOS
         Next                    ; Include interpreter
 
