@@ -13,9 +13,9 @@ dec
 create-code asm-dup
     edx pushd-reg
     eax  [esi] movd-reg-mem
-    esi  4 [b+esi] lea
+    esi  4 [b+esi] lead
     edi  [eax] movd-reg-mem
-    edi  jmp-near-reg
+    edi  jmpd-near-reg
 
 esi [esp] movd-reg-mem
 edi [ebp] movd-reg-mem
@@ -26,11 +26,11 @@ edi [ebp] movd-mem-reg
 
 eax ebx movd-reg-reg
 
-eax [esi] lea
-esi [esp] lea
-edi [ebp] lea
-eax  4 [b+esp] lea
-ecx  4 [b+ebp] lea
+eax [esi] lead
+esi [esp] lead
+edi [ebp] lead
+eax  4 [b+esp] lead
+ecx  4 [b+ebp] lead
 
 45 my-dup . .
 48 asm-dup . .

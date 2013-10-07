@@ -487,7 +487,7 @@ dup_:                            ; x -- x x
 ;--------------------------------
         align   4
 over_entry:
-        dd      rot_entry       ; Address of next word
+        dd      over2_entry      ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "over"          ; Word name
@@ -497,6 +497,21 @@ over:                           ; x1 x2 -- x1 x2 x1
         dd      over+4
         push edx
         mov edx, [esp+4]
+        Next
+
+;--------------------------------
+        align   4
+over2_entry:
+        dd      rot_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "over2"         ; Word name
+.nend:
+        align   4
+over2:                          ; x1 x2 x3 -- x1 x2 x3 x1
+        dd      over2+4
+        push edx
+        mov edx, [esp+8]
         Next
 
 ;--------------------------------
@@ -601,8 +616,8 @@ store_entry:
 .nst:   db      "!"             ; Word name
 .nend:
         align   4
-store_:                          ; x addr --
-        dd      store_+4         ; Code field
+store_:                         ; x addr --
+        dd      store_+4        ; Code field
         pop ebx                 ; Get X value
         mov [edx], ebx          ; Store X at ADDR
         pop edx                 ; Get new TOS

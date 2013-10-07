@@ -15,7 +15,8 @@
 | You should have received a copy of the GNU Affero General Public License
 | along with Nforth.  If not, see <http://www.gnu.org/licenses/>.
 
-: 2dup over over ;
+: 2dup ( xy--xyxy) over over ;
+: 3dup ( xyz--xyzxyz) over2 over2 over2 ;
 : 2drop drop drop ;
 : type ( au--) sys-print ;
 : assert ( bau--) rot if drop drop else type bye endif ;
@@ -29,6 +30,13 @@
 : allot ( n--) here + to here ;
 : b. ( b--) if " True " type else " False " type endif ;
 : newline " \n" type ;
+: >word-name ( a--au) dup swap 12 + swap 8 + @ ;
+: find-from ( aua--a) begin
+        dup 0 = if drop drop drop 0 exit endif
+        3dup >word-name str= if nip nip exit endif
+    @ again ;
+: find ( au--a) word-list find-from ;
+: 2' ( --a) get-word 2dup find @ find-from >body ;
 -1 constant true
 0 constant false
 
@@ -82,6 +90,7 @@ dec
     dup 16 <= if 2drop exit endif
     dump-next again ;
 : dump ( au--) over dump-header dump-data ;
+: dump-short ( au--) dump-data ;
 
 | Counted loop
 : do{ ( C:--a; R:u--) here ['] >r , ; immediate
