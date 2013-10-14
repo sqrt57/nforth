@@ -101,7 +101,7 @@ dec
     ['] - ,
     ['] dup ,
     ['] 0= ,
-    do-jump-if-not ,  ,
+    ['] jump-if-not ,  ,
     ['] drop , ; immediate
 
 | Switch control statement

@@ -705,12 +705,11 @@ jump_entry:
         dd      jump_if_not_entry       ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "do-jump"       ; Word name
+.nst:   db      "jump"          ; Word name
 .nend:
         align   4
-        dd      doconst, 0, jump
-jump:                           ; -- / addr from thread
-        dd      jump+4
+jump_:                          ; -- / addr from thread
+        dd      jump_+4
         mov esi, [esi]          ; Get new IP
         Next
 
@@ -720,17 +719,15 @@ jump_if_not_entry:
         dd      execute_entry   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "do-jump-if-not"        ; Word name
+.nst:   db      "jump-if-not"   ; Word name
 .nend:
         align   4
-        dd      doconst, 0, jump_if_not
 jump_if_not:                    ; b -- / addr from thread
         ; Jumps if TOS=0 (false)
         dd      jump_if_not+4
         lea esi, [esi+4]        ; If we don't take a jump we must skip
                                 ; jump address in the thread
-        xor eax, eax            ; Zero EAX
-        cmp edx, eax            ; Compare TOS to 0
+        cmp edx, 0              ; Compare TOS to 0
         jnz .continue           ; If B!=0 we skip updating IP
         mov esi, [esi-4]        ; Get new IP (if TOS=0)
 .continue:
@@ -970,8 +967,10 @@ mult_entry:
         align   4
 mult:                           ; n1 n2 -- n
         dd      mult+4
-        imul edx, [esp]         ; Multiply N1 by N2 and put result into TOS
-        lea esp, [esp+4]        ; Drop second element from parameter stack
+        pop eax                 ; Load N1 into EAX
+        imul edx                ; Multiply N1 by N2
+        mov edx, eax            ; Store result into TOS
+
         Next
 ;--------------------------------
         align   4
@@ -1002,10 +1001,10 @@ div_mod:                        ; n1 n2 -- n3 n4
         ; N4 = N1 div N2
         dd      div_mod+4
         mov ebx, edx            ; Store N2 in EBX
-        mov eax, [esp]          ; Store N1 in EAX
+        pop eax                 ; Store N1 in EAX
         cdq                     ; Sign-extend N1 to EDX:EAX
         idiv ebx                ; Signed divide N1 by N2
-        mov [esp], edx          ; Store remainder as N3
+        push edx                ; Store remainder as N3
         mov edx, eax            ; Store quotient as N4
         Next
 ;--------------------------------
@@ -1021,12 +1020,12 @@ udiv_mod:                       ; u1 u2 -- u3 u4
         ; U3 = U1 mod U2
         ; U4 = U1 div U2
         dd      udiv_mod+4
-        mov ebx, edx            ; Store N2 in EBX
-        mov eax, [esp]          ; Store N1 in EAX
+        mov ebx, edx            ; Store U2 in EBX
+        pop eax                 ; Store U1 in EAX
         xor edx, edx            ; Zero-extend EAX to EDX:EAX
-        div ebx                 ; Unsigned divide N1 by N2
-        mov [esp], edx          ; Store remainder as N3
-        mov edx, eax            ; Store quotient as N4
+        div ebx                 ; Unsigned divide U1 by U2
+        push edx                ; Store remainder as U3
+        mov edx, eax            ; Store quotient as U4
         Next
 ;--------------------------------
         align   4
@@ -1231,7 +1230,7 @@ drop_white:                     ; --
 .iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q
         dd      jump_if_not, .end
         dd      inside_tib, jump_if_not, .end
-        dd      lit, 1, to_in, plus_store, jump, .iter
+        dd      lit, 1, to_in, plus_store, jump_, .iter
 .end:   dd      exit
 ;--------------------------------
         align   4
@@ -1251,7 +1250,7 @@ get_word:                       ; -- addr u
 .iter:  dd      tib, to_in, fetch, plus, c_fetch, white_q, zero_equals
         dd      jump_if_not, .end
         dd      inside_tib, jump_if_not, .end
-        dd      lit, 1, to_in, plus_store, jump, .iter
+        dd      lit, 1, to_in, plus_store, jump_, .iter
 .end:   dd      to_in, fetch, swap, minus, exit
 ;--------------------------------
         align   4
@@ -1268,7 +1267,7 @@ cmove_:                         ; c-addr1 c-addr2 u --
 .iter:  dd      dup_, lit, 0, greater_than, jump_if_not, .end
         dd      rot, rot, over, c_fetch, over, c_store
         dd      lit, 1, plus, swap, lit, 1, plus, swap, rot
-        dd      lit, 1, minus, jump, .iter
+        dd      lit, 1, minus, jump_, .iter
 .end:   dd      drop, drop, drop
         dd      exit
 ;--------------------------------
@@ -1330,7 +1329,7 @@ find_entry:
 .nend:
         align   4
 find:                           ; c-addr u -- addr
-        dd      do_enter, 0, word_list, fetch, to_r, jump, .start
+        dd      do_enter, 0, word_list, fetch, to_r, jump_, .start
 .iter:
         dd      r_to, fetch, to_r
 .start:
@@ -1500,10 +1499,10 @@ rep_loop:
         dd      over, over
         dd      find, dup_, jump_if_not, .err
         dd      swap, drop, swap, drop
-        dd      eval_word, jump, .iter
+        dd      eval_word, jump_, .iter
 .err:   dd      drop, sys_print, word_not_found_str, sys_print
         dd      lit, 1, sys_exit
-        dd      jump, .iter
+        dd      jump_, .iter
 .end:   dd      drop, drop, exit
 ;--------------------------------
         align   4
@@ -1539,16 +1538,16 @@ db " create-exec : ] create-exec ] exit [ "
 db " : nip swap drop ; "
 db " : bye 0 sys-exit ; "
 
-db " : if do-jump-if-not , here 0 , ; immediate "
-db " : else do-jump , here 0 , swap here swap ! ; immediate "
-db " : endif here swap ! ; immediate "
-
-db " : begin here ; immediate "
-db " : again do-jump , , ; immediate "
-
 db " : literal lit lit , , ; immediate "
 db " : ' get-word find >body ; " ; "word" -- xt
 db " : ['] lit lit , get-word find >body , ; immediate " ; "word" --
+
+db " : if ['] jump-if-not , here 0 , ; immediate "
+db " : else ['] jump , here 0 , swap here swap ! ; immediate "
+db " : endif here swap ! ; immediate "
+
+db " : begin here ; immediate "
+db " : again ['] jump , , ; immediate "
 
 db " : variable create 0 , ; "
 db " : value create do-val last-xt @ ! , ; "

@@ -100,24 +100,24 @@ variable op-immed-size
 : pushd-reg ( c--) 50 + c, ;
 : popd-reg ( c--) 58 + c, ;
 
-: movd-reg-mem ( c--) op-reg !  8b c,  rest, ;
-: movd-reg-reg ( cc--) reg-r/m!  op-reg !  8b c,  rest, ;
-: movd-mem-reg ( c--) op-reg !  89 c,  rest, ;
-: movw-reg-mem ( c--) op-reg !  66 c, 8b c,  rest, ;
-: movw-reg-reg ( cc--) reg-r/m!  op-reg !  66 c, 8b c,  rest, ;
-: movw-mem-reg ( c--) op-reg !  66 c, 89 c,  rest, ;
-: movb-reg-mem ( c--) op-reg !  8a c,  rest, ;
-: movb-reg-reg ( cc--) reg-r/m!  op-reg !  8a c,  rest, ;
-: movb-mem-reg ( c--) op-reg !  88 c,  rest, ;
+: movd-reg-mem ( c--) op-reg !  8b c, rest, ;
+: movd-reg-reg ( cc--) op-reg !  reg-r/m!  89 c, rest, ;
+: movd-mem-reg ( c--) op-reg !  89 c, rest, ;
+: movw-reg-mem ( c--) op-reg !  66 c, 8b c, rest, ;
+: movw-reg-reg ( cc--) op-reg !  reg-r/m!  66 c, 89 c, rest, ;
+: movw-mem-reg ( c--) op-reg !  66 c, 89 c, rest, ;
+: movb-reg-mem ( c--) op-reg !  8a c, rest, ;
+: movb-reg-reg ( cc--) op-reg !  reg-r/m!  88 c, rest, ;
+: movb-mem-reg ( c--) op-reg !  88 c, rest, ;
 
-: lead ( c--) op-reg !  8d c,  rest, ;
+: lead ( c--) op-reg !  8d c, rest, ;
 
-: jmpd-near-mem ( --)  4 op-reg !  ff c,  rest, ;
-: jmpd-near-reg ( c--)  reg-r/m!  4 op-reg !  ff c,  rest, ;
+: jmpd-near-mem ( --)  4 op-reg !  ff c, rest, ;
+: jmpd-near-reg ( c--)  reg-r/m!  4 op-reg !  ff c, rest, ;
 
-: xchgd-mem-reg ( c--) op-reg !  87 c,  rest, ;
-: xchgd-reg-mem ( c--) op-reg !  87 c,  rest, ;
-: xchgd-reg-reg ( cc--) reg-r/m!  op-reg !  87 c,  rest, ;
+: xchgd-mem-reg ( c--) op-reg !  87 c, rest, ;
+: xchgd-reg-mem ( c--) op-reg !  87 c, rest, ;
+: xchgd-reg-reg ( cc--) reg-r/m!  op-reg !  87 c, rest, ;
 : xchgd-eax-reg ( c--) 90 + c, ;
 : xchgd-reg-eax ( c--) 90 + c, ;
 
@@ -127,3 +127,105 @@ variable op-immed-size
 : movzx-regw-regb ( cc--) reg-r/m!  op-reg !  66 c, 0f c, b6 c, rest, ;
 : movzx-regd-memw ( c--) op-reg !  0f c, b7 c, rest, ;
 : movzx-regd-regw ( cc--) reg-r/m!  op-reg !  0f c, b7 c, rest, ;
+
+: xord-reg-mem ( c--) op-reg !  33 c, rest, ;
+: xord-reg-reg ( cc--) op-reg !  reg-r/m!  31 c, rest, ;
+: xord-mem-reg ( c--) op-reg !  31 c, rest, ;
+
+: andd-reg-mem ( c--) op-reg !  23 c, rest, ;
+: andd-reg-reg ( cc--) op-reg !  reg-r/m!  21 c, rest, ;
+: andd-mem-reg ( c--) op-reg !  21 c, rest, ;
+
+: ord-reg-mem ( c--) op-reg !  0b c, rest, ;
+: ord-reg-reg ( cc--) op-reg !  reg-r/m!  09 c, rest, ;
+: ord-mem-reg ( c--) op-reg !  09 c, rest, ;
+
+: addd-reg-mem ( c--) op-reg !  03 c, rest, ;
+: addd-reg-reg ( cc--) op-reg !  reg-r/m!  01 c, rest, ;
+: addd-mem-reg ( c--) op-reg !  01 c, rest, ;
+
+: subd-reg-mem ( c--) op-reg !  2b c, rest, ;
+: subd-reg-reg ( cc--) op-reg !  reg-r/m!  29 c, rest, ;
+: subd-mem-reg ( c--) op-reg !  29 c, rest, ;
+
+: imuld-reg-mem ( c--) op-reg !  0f c, af c, rest, ;
+: imuld-reg-reg ( cc--) reg-r/m!  op-reg !  0f c, af c, rest, ;
+: imuld-mem ( --) 5 op-reg !  f7 c, rest, ;
+: imuld-reg ( c--) reg-r/m!  5 op-reg !  f7 c, rest, ;
+
+: muld-mem ( --) 4 op-reg !  f7 c, rest, ;
+: muld-reg ( c--) reg-r/m!  4 op-reg !  f7 c, rest, ;
+
+: idivd-mem ( --) 7 op-reg !  f7 c, rest, ;
+: idivd-reg ( c--) reg-r/m!  7 op-reg !  f7 c, rest, ;
+
+: divd-mem ( --) 6 op-reg !  f7 c, rest, ;
+: divd-reg ( c--) reg-r/m!  6 op-reg !  f7 c, rest, ;
+
+: notd-mem ( --) 2 op-reg !  f7 c, rest, ;
+: notd-reg ( c--) reg-r/m!  2 op-reg !  f7 c, rest, ;
+
+: decd-mem ( --) 1 op-reg !  ff c, rest, ;
+: decd-reg ( c--) 48 + c, ;
+
+: negd-mem ( --) 3 op-reg !  f7 c, rest, ;
+: negd-reg ( c--) reg-r/m! 3 op-reg !  f7 c, rest, ;
+
+: cmpd-reg-mem ( c--) op-reg !  3b c, rest, ;
+: cmpd-reg-reg ( cc--) op-reg !  reg-r/m!  39 c, rest, ;
+: cmpd-mem-reg ( c--) op-reg !  39 c, rest, ;
+
+: cmpd-reg-immb ( cc--) swap reg-r/m!  7 op-reg !  83 c, rest, c, ;
+: cmpd-reg-immd ( cu--) swap reg-r/m!  7 op-reg !  81 c, rest, , ;
+: cmpd-mem-immb ( c--) 7 op-reg !  83 c, rest, c, ;
+: cmpd-mem-immd ( u--) 7 op-reg !  81 c, rest, , ;
+
+: cdq ( --) 99 c, ;
+
+: shld-mem-cl ( --) 4 op-reg !  d3 c, rest, ;
+: shld-reg-cl ( c--) reg-r/m!  4 op-reg !  d3 c, rest, ;
+
+: shrd-mem-cl ( --) 5 op-reg !  d3 c, rest, ;
+: shrd-reg-cl ( c--) reg-r/m!  5 op-reg !  d3 c, rest, ;
+
+70 constant jo
+71 constant jno
+72 constant jb
+72 constant jc
+72 constant jnae
+73 constant jnb
+73 constant jnc
+73 constant jae
+74 constant jz
+74 constant je
+75 constant jnz
+75 constant jne
+76 constant jbe
+76 constant jna
+77 constant jnbe
+77 constant ja
+78 constant js
+79 constant jns
+7a constant jp
+7a constant jpe
+7b constant jnp
+7b constant jpo
+7c constant jl
+7c constant jnge
+7d constant jnl
+7d constant jge
+7e constant jle
+7e constant jng
+7f constant jnle
+7f constant jg
+
+: check-short ( u--) ffffff80 and dup 0 = swap ffffff80 = or not if
+    " Short jump must fit into signed byte." type newline bye endif ;
+: |->b ( c--u) c, 0 c, here ;
+: ->|b ( u--) here over - dup check-short swap 1 - c! ;
+: |->d ( c--u) 0f c, 10 + c, 0 , here ;
+: ->|d ( u--) here over - swap 4 - ! ;
+: |<-b ( --u) here ;
+: <-|b ( uc--) c, here 1 + - dup check-short c, ;
+: |<-d ( --u) here ;
+: <-|d ( uc--) 0f c, 10 + c, here 4 + - , ;
