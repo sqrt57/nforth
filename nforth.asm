@@ -67,13 +67,24 @@ PLATFORM_SECTION_DATA
 ;--------------------------------
         align   4
 here_entry:
-        dd      tib_entry       ; Address of next word
+        dd      dict_start_entry        ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "here"          ; Word name
 .nend: 
         align   4
 here:   dd      doval, 0, dictionary_start_addr
+;--------------------------------
+        align   4
+dict_start_entry:
+        dd      tib_entry       ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "dict-start"    ; Word name
+.nend: 
+        align   4
+dict_start:
+        dd      doconst, 0, dictionary_start_addr
 ;--------------------------------
         align   4
 tib_entry:

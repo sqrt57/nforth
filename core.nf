@@ -92,6 +92,11 @@ dec
 : dump ( au--) over dump-header dump-data ;
 : dump-short ( au--) dump-data ;
 
+: mem-info ( --) newline
+    " Dictionary: " type here dict-start - . " /65536" type newline
+    " Strings: " type string-here @ string-buffer - . " /" type
+        string-buffer-length . newline ;
+
 | Counted loop
 : do{ ( C:--a; R:u--) here ['] >r , ; immediate
 : }do ( C:a--; R:--)
