@@ -1518,7 +1518,7 @@ rep_loop:
 ;--------------------------------
         align   4
 main_entry:
-        dd      0               ; Address of next word
+        dd      platform_dict   ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
 .nst:   db      "main"          ; Word name

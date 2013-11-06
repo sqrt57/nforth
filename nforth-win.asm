@@ -13,6 +13,7 @@ section '.bss' data readable writeable
         hStdout         rd      1
         hStdin          rd      1
         actual_bytes    rd      1
+        hHeap           rd      1
         argv_buf        rd      64
         str_buffer      rb      64*1024
 }
@@ -53,6 +54,11 @@ platform_start:
         call [GetStdHandle]     ; Get standard input handle
         mov [hStdin], eax       ; Store it in hStdin
         mov [stdin], eax        ; Store it in stdin constant
+        
+        ;; Getting default process heap
+        
+        call [GetProcessHeap]   ; Get default process heap handle
+        mov [hHeap], eax        ; store it in hHeap
         
         ;; Here we parse command line into separate arguments
         
@@ -131,6 +137,96 @@ done:
         mov [argv], argv_buf    ; Store address of arguments array in argv
         
         jmp start               ; Jump to common start for all platforms
+
+;; Windows-specific dictionary entries        
+;--------------------------------
+align   4
+alloc_entry:
+        dd      free_entry      ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "alloc"         ; Word name
+.nend:
+
+;--------------------------------
+        align   4
+alloc:                          ; u -- addr
+        ; Allocates memory of given size
+        dd      alloc+4         ; Code field
+        push edx                ; dwBytes
+        push 0dh                ; dwFlags = HEAP_GENERATE_EXCEPTIONS
+                                ; | HEAP_NO_SERIALIZE | HEAP_ZERO_MEMORY
+        push [hHeap]            ; hHeap = hHeap
+        call [HeapAlloc]        ; Allocate memory
+        mov edx, eax            ; Store memory address in TOS
+        Next
+
+;--------------------------------
+        align   4
+free_entry:
+        dd      sys_open_rw_overwrite_entry     ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "free"          ; Word name
+.nend:
+        align   4
+free:                           ; addr --
+        ; Frees allocated memory block
+        dd      free+4          ; Code field
+        push edx                ; lpMem
+        push 01h                ; dwFlags = HEAP_NO_SERIALIZE
+        push [hHeap]            ; hHeap = hHeap
+        call [HeapFree]         ; Allocate memory
+        pop edx                 ; Get TOS from stack
+        Next
+
+;--------------------------------
+        align   4
+sys_open_rw_overwrite_entry:
+        dd      sys_write_entry ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-open-rw-overwrite"   ; Word name
+.nend:
+        align   4
+sys_open_rw_overwrite:          ; addr -- u
+        ; Opens file with name addr (null-terminated string)
+        ; and returns file handle
+        dd      sys_open_rw_overwrite+4 ; Code field
+        push 0                  ; hTemplateFile
+        push 0x80               ; dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL
+        push 2                  ; dwCreationDisposition = CREATE_ALWAYS
+        push 0                  ; lpSecurityAttributes
+        push 0x00000001         ; dwShareMode = FILE_SHARE_READ
+        push 0xC0000000         ; dwDesiredAccess = GENERIC_READ|GENERIC_WRITE
+        push edx                ; File name as null-terminated string
+        call [CreateFile]       ; Open the file
+        mov edx, eax            ; Store file handle in EDX
+        Next
+;--------------------------------
+        align   4
+sys_write_entry:
+        dd      0               ; Address of next word
+        dd      0               ; Flags
+        dd      .nend - .nst    ; Length of word name
+.nst:   db      "sys-write"     ; Word name
+.nend:
+        align   4
+sys_write:                      ; addr u handle --
+        ; Writes data to file
+        dd      sys_write+4     ; Code field
+        pop ebx                 ; Pop length of data into EBX
+        pop eax                 ; Pop address of string into EAX
+        push 0                  ; lpOverlapped, not used
+        push actual_bytes       ; Address of variable for storing number of
+                                ; bytes actually written
+        push ebx                ; Number of bytes to write
+        push eax                ; Address of string
+        push edx                ; File handle handle
+        call [WriteFile]        ; Call WriteFile from kernel32.dll
+        pop edx                 ; We consumed one input,
+                                ; so we must fill EDX from stack
+        Next
 }
 
 macro PLATFORM_EXTRA
@@ -144,7 +240,11 @@ section '.idata' import data readable writable
                 ReadFile, 'ReadFile', \
                 GetCommandLine , 'GetCommandLineA', \
                 CreateFile, 'CreateFileA', \
-                CloseHandle, 'CloseHandle'
+                CloseHandle, 'CloseHandle', \
+                GetProcessHeap, 'GetProcessHeap', \
+                HeapAlloc, 'HeapAlloc', \
+                HeapFree, 'HeapFree', \
+                HeapReAlloc, 'HeapReAlloc'
 }
 
 ;; All platform-specific code must preserve ESI, EBP.
@@ -172,7 +272,7 @@ macro PLATFORM_SYS_PRINT
         push [hStdout]          ; Standard output handle
         call [WriteFile]        ; Call WriteFile from kernel32.dll
         pop edx                 ; We consumed one input,
-                                ; so we must fill EDX drom stack
+                                ; so we must fill EDX from stack
 }
 
 ; Reads data from file to buffer
@@ -258,7 +358,7 @@ macro PLATFORM_SYS_OPEN_RO
         push 3                  ; dwCreationDisposition = OPEN_EXISTING
         push 0                  ; lpSecurityAttributes
         push 0x00000001         ; dwShareMode = FILE_SHARE_READ
-        push 0x80000000         ; dwDesiredAccess = GENRIC_READ
+        push 0x80000000         ; dwDesiredAccess = GENERIC_READ
         push edx                ; File name as null-terminated string
         call [CreateFile]       ; Open the file
         mov edx, eax            ; Store file handle in EDX
@@ -307,5 +407,7 @@ forward
     align   2
     name_hint  db  0, 0, external_name, 0
 }
+
+platform_dict = alloc_entry
 
 include "nforth.asm"

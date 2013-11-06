@@ -120,4 +120,6 @@ macro PLATFORM_SYS_CLOSE
         pop edx                 ; Pop new TOS from stack
 }
 
+platform_dict = 0
+
 include "nforth.asm"

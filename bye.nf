@@ -1,2 +1,3 @@
+dec
 mem-info
 bye

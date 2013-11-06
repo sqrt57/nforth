@@ -15,6 +15,9 @@
 | You should have received a copy of the GNU Affero General Public License
 | along with Nforth.  If not, see <http://www.gnu.org/licenses/>.
 
+dec
+: tuck  ( x y -- y x y) swap over ;
+: -rot ( x y z -- y z x) rot rot ;
 : 2dup ( xy--xyxy) over over ;
 : 3dup ( xyz--xyzxyz) over2 over2 over2 ;
 : 2drop drop drop ;
@@ -39,6 +42,12 @@
 : 2' ( --a) get-word 2dup find @ find-from >body ;
 -1 constant true
 0 constant false
+
+: pad+ ( u -- u) pad + 1 + ;
+: put-zero ( u --) dup + pad+ 0 swap c! ;
+: store-str ( addr u --) dup pad+ swap cmove ;
+| Converts string with a length to zero-terminated string
+: zero-str ( addr u -- addr) dup put-zero tuck store-str pad+ ;
 
 : add-word ( au--) align
     here  word-list @ ,  word-list !
