@@ -71,7 +71,7 @@ hex
     dup 10 rshift 0ff and 2hex.
     dup 08 rshift 0ff and 2hex.
                   0ff and 2hex. ;
-: safe-emit ( c--) dup 20 7F within if emit else drop " ." type endif ;
+: safe-emit ( c--) dup 20 7F within if emit else drop "  " type endif ;
 dec
 | Helpers for dumping
 : dh-intro "          " type ;
