@@ -26,7 +26,7 @@ import-names @ 60 dump
 " win-read-file = " type win-read-file . newline
 
 " build\\abc.exe" pecoff-write
-" \"build\\abc.exe\" written. Total bytes: " type dec image-length @ . newline
+" \"build\\abc.exe\" written. Total bytes: " type dec file-length @ . newline
 pecoff-done
 
 dec

@@ -27,8 +27,21 @@ variable image-pos
 variable image-length
 variable import-refs-length
 variable import-names-length
+variable file-length
 
-148 constant section-file-pointer
+variable bss-length     | Size of uninitialized data - zero for now
+variable entry-rva      | Entry point TODO Fill with meaningful value
+
+variable section-base
+variable ilts-base
+variable names-base
+
+variable dt-length
+variable ilts-length
+
+1000 constant section-rva
+200 constant section-file-pointer  | 148, but must be aligned at 200
+: section-length ( -- u) image-length @ section-file-pointer - ;
 
 : image-here ( -- addr) image @ image-pos @ + ;
 : import-refs-here ( -- addr) import-refs @ import-refs-length @ + ;
@@ -40,6 +53,9 @@ variable import-names-length
 : image-align ( u --) image-pos @ aligned image-pos ! ;
 : r, ( u --) import-refs-here !  4 import-refs-length +! ;
 
+: rva ( addr -- u) section-base @ - section-rva + ;
+: nrva ( addr -- u) import-names @ -  names-base @ +  rva ;
+
 : alloc-image ( --) 18000 alloc dup pecoff-mem !
     dup image !
     dup 10000 + import-refs !
@@ -47,11 +63,11 @@ variable import-names-length
     0 image-pos !
     0 import-refs-length !
     0 import-names-length !
+    0 bss-length !
 ;
 
 : init-here ( --) here old-here !  image @ to here ;
 : pe-header-mz ( --) 5a4d iw,  3a image-pos +!  40 i, ;
-| * means the field must be filled with meaningful value
 | COFF header
 : pe-header-coff ( --)
     14c iw,     | IMAGE_FILE_MACHINE_I386
@@ -59,20 +75,20 @@ variable import-names-length
     0 i,        | TimeDateStamp
     0 i,        | PointerToSymbolTable
     0 i,        | NumberOfSymbols
-    0    iw,    | * SizeOfOptionalHeader
+    108 iw,     | SizeOfOptionalHeader
     0103 iw,    | Characteristics = IMAGE_FILE_RELOCS_STRIPPED
                 | | IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE
 ;
 | Optional header
 : pe-header-opt ( --)
-    10 iw,      | PE32 magic number
-    0 ic, 1 ic, | Major and minor linker version
-    0 i,        | * SizeOfCode
-    0 i,        | * SizeOfInitializedData
-    0 i,        | * SizeOfUninitializedData
-    0 i,        | * AddressOfEntryPoint
-    0 i,        | * BaseOfCode
-    0 i,        | * BaseOfData
+    10 iw,              | PE32 magic number
+    0 ic, 1 ic,         | Major and minor linker version
+    section-length i,   | SizeOfCode
+    section-length i,   | SizeOfInitializedData
+    bss-length @ i,     | SizeOfUninitializedData
+    entry-rva @ i,      | AddressOfEntryPoint
+    section-rva i,      | BaseOfCode
+    section-rva i,      | BaseOfData
 ;
 | Optional header Windows-specific fields
 : pe-header-opt-win ( --)
@@ -81,23 +97,23 @@ variable import-names-length
     00000200 i, | FileAlignment
     5 iw, 0 iw, | Major and minor OS version = 5.0 (Windows 2000)
     0 iw, 1 iw, | Major and minor image version
-    0 iw, 1 iw, | Major and minor subsystem version
+    5 iw, 0 iw, | Major and minor subsystem version
     0 i,        | Win32VersionValue, reserved
-    0 i,        | * SizeOfImage
-    0 i,        | * SizeOfHeaders
-    0 i,        | * CheckSum
+    section-rva section-length + bss-length @ + 9 bits-aligned i, | SizeOfImage
+    section-file-pointer i,  | SizeOfHeaders
+    0 i,        | CheckSum
     3 iw,       | Subsystem = IMAGE_SUBSYSTEM_WINDOWS_CUI
     0 iw,       | DllCharacteristics
-    0 i,        | * SizeOfStackReserve
-    0 i,        | * SizeOfStackCommit
-    0 i,        | * SizeOfHeapReserve
-    0 i,        | * SizeOfHeapCommit
+    100000 i,   | SizeOfStackReserve = 1 Mb
+    1000 i,     | SizeOfStackCommit  = 64 Kb (one page)
+    1000000 i,  | SizeOfHeapReserve  = 16 Mb
+    1000 i,     | SizeOfHeapCommit   = 64 Kb (one page)
     0 i,        | LoaderFlags, reserved
-    0d i,       | NumberOfRvaAndSizes
+    0d i,       | NumberOfRvaAndSizes = 13
 ;
 : pe-header-data-dict ( --)
     0 i, 0 i,   | Export Table
-    0 i, 0 i,   | * Import Lookup Table
+    section-rva i,  ilts-base @ section-base @ - i, | Import Table
     0 i, 0 i,   | Resource Table
     0 i, 0 i,   | Exception Table
     0 i, 0 i,   | Certificate Table
@@ -108,16 +124,16 @@ variable import-names-length
     0 i, 0 i,   | TLS Table
     0 i, 0 i,   | Load Config Table
     0 i, 0 i,   | Bound Import
-    0 i, 0 i,   | * Import Address Table
+    ilts-base @ ilts-length @ + rva i, ilts-length @ i, | Import Address Table
 ;
 
 : section-table ( --)
     | There is just one entry in section table
-    7865742e i, 00000074 i, | Name = ".text\0\0\0"
-    0 i,        | * VirtualSize
-    0 i,        | * VirtualAddress
-    0 i,        | * SizeOfRawData
-    0 i,        | * PointerToRawData
+    7865742e i, 00000074 i,             | Name = ".text\0\0\0"
+    section-length bss-length @ + i,    | VirtualSize
+    section-rva i,                      | VirtualAddress
+    section-length 9 bits-aligned i,    | SizeOfRawData
+    section-file-pointer i,             | PointerToRawData
     0 i,        | PointerToRelocations
     0 i,        | PointerToLinenumbers
     0 iw,       | NumberOfRelocations
@@ -140,8 +156,9 @@ variable import-names-length
 : pecoff-init ( --) alloc-image section-file-pointer image-pos ! ;
 
 : open ( addr u -- handle) zero-str sys-open-rw-overwrite ;
-: write ( handle --) image @ image-length @ rot sys-write ;
-: set-length ( --) image-pos @ image-length ! ;
+: write ( handle --) image @ file-length @ rot sys-write ;
+: set-length ( --) image-pos @ dup image-length !
+    9 bits-aligned file-length ! ;
 | Writes PE/COFF image to file with specified filename.
 : pecoff-write ( addr u --) set-length 0 image-pos ! pe-header
     open dup write sys-close ;
@@ -177,21 +194,22 @@ variable local-symbol-counter
 : import-symbol: ( addr u "word"--) 1 local-symbol-counter @ +!
     1 symbol-count +!
     create here r, 0 ,  import-names-here r,  copy-name  does> @ ;
-variable section-base
+
 : calc-section-base ( --) image @ section-file-pointer + section-base ! ;
-variable ilts-base
-: calc-ilts-base ( --) section-base @  dll-count @ 14 * +  14 +  ilts-base ! ;
-variable names-base
-: calc-names-base ( --) section-base @  dll-count @ 1c * +
-    symbol-count @ 8 * +  14 +  names-base ! ;
+: calc-dt-length ( -- ) dll-count @ 14 * 14 + dt-length ! ;
+: calc-ilts-length ( -- ) dll-count @ 4 * symbol-count @ 4 * + ilts-length ! ;
+: calc-ilts-base ( --) section-base @ dt-length @ + ilts-base ! ;
+: calc-names-base ( --) section-base @ dt-length @ + ilts-length @ 2 * +
+    names-base ! ;
 variable dt-addr
 variable ilt-addr
 : dt, ( u --) dt-addr @ !  4 dt-addr +! ;
 : ilt, ( u --) ilt-addr @ !  4 ilt-addr +! ;
-: rva ( addr -- u) section-base @ - ;
-: nrva ( addr -- u) import-names @ -  names-base @ +  rva ;
-: dt-entry ( addr --) ilt-addr @ rva dt,  0 dt,  0 dt,  dup dll-name nrva dt,
-    ilt-addr @ over dll-ilts-length + rva  dt,  drop ;
+: dt-entry ( addr --)
+    ilt-addr @ ilts-length @ - rva dt,
+    0 dt,  0 dt, 
+    dup dll-name nrva dt,
+    ilt-addr @ rva dt,  drop ;
 : dt-zero ( --) 0 dt, 0 dt, 0 dt, 0 dt, 0 dt, ;
 : next-symbol ( addr -- addr) 8 + ;
 : symbol-rva, ( addr --) ilt-addr @ rva swap symbol-cell ! ;
@@ -199,16 +217,17 @@ variable ilt-addr
 : process-symbols ( addr u --) begin dup 0 = if 0 ilt, drop drop exit endif 1 -
     swap dup fill-symbol next-symbol swap again ;
 : next-dll ( addr -- addr) dup dll-num 8 * + 8 + ;
-: fill-dll ( addr --) dup dt-entry 8 + dup 8 - dll-num 2dup
-    process-symbols process-symbols ;
+: fill-dll ( addr --) dup dt-entry 8 + dup 8 - dll-num process-symbols ;
 : process-imports ( addr u --) begin dup 0 = if drop drop exit endif 1 -
     swap dup fill-dll next-dll swap again ;
 : fill-image-imports ( --) 
     image-here dt-addr !
-    ilts-base @  ilt-addr !
-    import-refs @ dll-count @ process-imports ;
+    ilts-base @ ilts-length @ + ilt-addr !
+    import-refs @ dll-count @ process-imports
+    ilts-base @ ilts-length @ +  ilts-base @  ilts-length @ cmove ;
 : copy-names ( --) import-names @  names-base @  import-names-length @  cmove ;
 : update-image-pos ( --) names-base @ import-names-length @ +
     image @ -  image-pos ! ;
-: import-done ( --) calc-section-base calc-names-base calc-ilts-base
+: import-done ( --) calc-dt-length calc-ilts-length
+    calc-section-base calc-names-base calc-ilts-base
     fill-image-imports copy-names update-image-pos ;

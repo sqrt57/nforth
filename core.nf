@@ -43,6 +43,8 @@ dec
 -1 constant true
 0 constant false
 
+: bits-aligned ( addr u -- addr) swap 1 - over rshift 1 + swap lshift ;
+
 : pad+ ( u -- u) pad + 1 + ;
 : put-zero ( u --) dup + pad+ 0 swap c! ;
 : store-str ( addr u --) dup pad+ swap cmove ;
