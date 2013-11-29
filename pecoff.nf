@@ -39,8 +39,9 @@ variable names-base
 variable dt-length
 variable ilts-length
 
+400000 constant image-base
 1000 constant section-rva
-200 constant section-file-pointer  | 148, but must be aligned at 200
+200 constant section-file-pointer  | 138, but must be aligned at 200
 : section-length ( -- u) image-length @ section-file-pointer - ;
 
 : image-here ( -- addr) image @ image-pos @ + ;
@@ -75,16 +76,16 @@ variable ilts-length
     0 i,        | TimeDateStamp
     0 i,        | PointerToSymbolTable
     0 i,        | NumberOfSymbols
-    108 iw,     | SizeOfOptionalHeader
+    e0 iw,      | SizeOfOptionalHeader
     0103 iw,    | Characteristics = IMAGE_FILE_RELOCS_STRIPPED
                 | | IMAGE_FILE_EXECUTABLE_IMAGE | IMAGE_FILE_32BIT_MACHINE
 ;
 | Optional header
 : pe-header-opt ( --)
-    10 iw,              | PE32 magic number
+    10b iw,             | PE32 magic number
     0 ic, 1 ic,         | Major and minor linker version
-    section-length i,   | SizeOfCode
-    section-length i,   | SizeOfInitializedData
+    section-length 9 bits-aligned i,    | SizeOfCode
+    section-length 9 bits-aligned i,    | SizeOfInitializedData
     bss-length @ i,     | SizeOfUninitializedData
     entry-rva @ i,      | AddressOfEntryPoint
     section-rva i,      | BaseOfCode
@@ -92,8 +93,8 @@ variable ilts-length
 ;
 | Optional header Windows-specific fields
 : pe-header-opt-win ( --)
-    00400000 i, | ImageBase
-    00000200 i, | SectionAlignment
+    image-base i,   | ImageBase
+    00001000 i, | SectionAlignment
     00000200 i, | FileAlignment
     5 iw, 0 iw, | Major and minor OS version = 5.0 (Windows 2000)
     0 iw, 1 iw, | Major and minor image version
@@ -109,7 +110,7 @@ variable ilts-length
     1000000 i,  | SizeOfHeapReserve  = 16 Mb
     1000 i,     | SizeOfHeapCommit   = 64 Kb (one page)
     0 i,        | LoaderFlags, reserved
-    0d i,       | NumberOfRvaAndSizes = 13
+    10 i,       | NumberOfRvaAndSizes = 16
 ;
 : pe-header-data-dict ( --)
     0 i, 0 i,   | Export Table
@@ -125,6 +126,9 @@ variable ilts-length
     0 i, 0 i,   | Load Config Table
     0 i, 0 i,   | Bound Import
     ilts-base @ ilts-length @ + rva i, ilts-length @ i, | Import Address Table
+    0 i, 0 i,   | Delay Import Descriptor
+    0 i, 0 i,   | CLR Runtime Header
+    0 i, 0 i,   | Reserved
 ;
 
 : section-table ( --)
@@ -140,7 +144,7 @@ variable ilts-length
     0 iw,       | NumberOfLinenumbers
     e00000e0 i, | Characteristics = IMAGE_SCN_CNT_CODE
                 | | IMAGE_SCN_CNT_INITIALIZED_DATA
-                | | IMAGE_SCN_CNT_UNINITIALIZED_ DATA
+                | | IMAGE_SCN_CNT_UNINITIALIZED_DATA
                 | | IMAGE_SCN_MEM_EXECUTE
                 | | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE
 ;
@@ -152,6 +156,11 @@ variable ilts-length
     pe-header-coff pe-header-opt pe-header-opt-win
     pe-header-data-dict section-table ;
 
+variable old-here
+: save-here ( --) here old-here ! ;
+: update-here ( --) image-here to here ;
+: restore-here ( --) old-here @ to here ;
+
 | Allocates memory structures for constructing PE/COFF file.
 : pecoff-init ( --) alloc-image section-file-pointer image-pos ! ;
 
@@ -161,7 +170,7 @@ variable ilts-length
     9 bits-aligned file-length ! ;
 | Writes PE/COFF image to file with specified filename.
 : pecoff-write ( addr u --) set-length 0 image-pos ! pe-header
-    open dup write sys-close ;
+    open dup write sys-close restore-here ;
 
 | Frees memory structures allocated for PE/COFF image.
 : pecoff-done ( --) pecoff-mem @ free ;
@@ -187,13 +196,16 @@ variable ilts-length
 variable dll-count  0 dll-count !
 variable symbol-count  0 symbol-count !
 variable local-symbol-counter
-: import-dll ( addr u --) 1 dll-count +!  copy-name r,
+: align-names ( --) import-names-length @ 1 bits-aligned import-names-length ! ;
+: import-dll ( addr u --) 1 dll-count +! align-names copy-name r,
     import-refs-here local-symbol-counter !  0 r, ;
 | Takes symbol name as input, imports the symbol. Creates word with name
 | from input stream and makes it return rva of imported symbol.
 : import-symbol: ( addr u "word"--) 1 local-symbol-counter @ +!
-    1 symbol-count +!
-    create here r, 0 ,  import-names-here r,  copy-name  does> @ ;
+    1 symbol-count +!  align-names
+    create here r, 0 ,  import-names-here r,
+    0 import-names-here w!  2 import-names-length +!
+    copy-name drop  does> @ ;
 
 : calc-section-base ( --) image @ section-file-pointer + section-base ! ;
 : calc-dt-length ( -- ) dll-count @ 14 * 14 + dt-length ! ;
@@ -207,12 +219,12 @@ variable ilt-addr
 : ilt, ( u --) ilt-addr @ !  4 ilt-addr +! ;
 : dt-entry ( addr --)
     ilt-addr @ ilts-length @ - rva dt,
-    0 dt,  0 dt, 
+    0 dt,  -1 dt, 
     dup dll-name nrva dt,
     ilt-addr @ rva dt,  drop ;
 : dt-zero ( --) 0 dt, 0 dt, 0 dt, 0 dt, 0 dt, ;
 : next-symbol ( addr -- addr) 8 + ;
-: symbol-rva, ( addr --) ilt-addr @ rva swap symbol-cell ! ;
+: symbol-rva, ( addr --) ilt-addr @ rva image-base + swap symbol-cell ! ;
 : fill-symbol ( addr --) dup symbol-rva, symbol-name nrva ilt, ;
 : process-symbols ( addr u --) begin dup 0 = if 0 ilt, drop drop exit endif 1 -
     swap dup fill-symbol next-symbol swap again ;
@@ -228,6 +240,9 @@ variable ilt-addr
 : copy-names ( --) import-names @  names-base @  import-names-length @  cmove ;
 : update-image-pos ( --) names-base @ import-names-length @ +
     image @ -  image-pos ! ;
+: init-compiler ( --) save-here update-here ;
 : import-done ( --) calc-dt-length calc-ilts-length
     calc-section-base calc-names-base calc-ilts-base
-    fill-image-imports copy-names update-image-pos ;
+    fill-image-imports copy-names update-image-pos
+    init-compiler ;
+: set-code-entry ( addr --) rva entry-rva ! ;

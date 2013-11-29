@@ -96,9 +96,15 @@ variable op-immed-size
 : [b+esi] op-disp !  1 op-mod !  6 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
 : [b+edi] op-disp !  1 op-mod !  7 op-r/m !  0 op-sib? !  1 op-disp-size ! ;
 
+| disp32 --
+: [d] op-disp !  0 op-mod !  5 op-r/m !  0 op-sib? ! 3 op-disp-size ! ;
+
 | --- Instructions
 : pushd-reg ( c--) 50 + c, ;
 : popd-reg ( c--) 58 + c, ;
+: pushd-immd ( u --) 68 c, , ;
+: pushd-immw ( w --) 66 c, 68 c, w, ;
+: pushd-immb ( c --) 6a c, c, ;
 
 : movd-reg-mem ( c--) op-reg !  8b c, rest, ;
 : movd-reg-reg ( cc--) op-reg !  reg-r/m!  89 c, rest, ;
@@ -114,6 +120,9 @@ variable op-immed-size
 
 : jmpd-near-mem ( --)  4 op-reg !  ff c, rest, ;
 : jmpd-near-reg ( c--)  reg-r/m!  4 op-reg !  ff c, rest, ;
+
+: call-near-mem ( --) 2 op-reg ! ff c, rest, ;
+: call-near-reg ( c--)  reg-r/m!  2 op-reg !  ff c, rest, ;
 
 : xchgd-mem-reg ( c--) op-reg !  87 c, rest, ;
 : xchgd-reg-mem ( c--) op-reg !  87 c, rest, ;
