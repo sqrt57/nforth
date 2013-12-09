@@ -241,7 +241,7 @@ zero_char_entry:
         dd      a_char_entry    ; Address of next word
         dd      0               ; Flags
         dd      .nend - .nst    ; Length of word name
-.nst:   db      "0c"
+.nst:   db      "zeroc"
 .nend:
         align   4
 zero_char:
@@ -1614,7 +1614,7 @@ db " : hex [ ten four 1 1 + + + ] literal base ! ; "
 db " : bin [ 1 1 + ] literal base ! ; "
 db " dec "
 
-db " : dig>char dup ten < if 0c + else ten - ac + endif ; " ; u -- c
+db " : dig>char dup ten < if zeroc + else ten - ac + endif ; " ; u -- c
 db " : u>str begin >r base @ u/mod swap dig>char r@ c! " ; u addr1 -- addr2
 db      " dup 0= if drop r> exit endif r> 1 - again ; "
 db " : u>pad space pad 1 + c! " ; u1 -- addr u2
@@ -1626,7 +1626,7 @@ db      " u>pad ; "
 db " : . n>pad sys-print ; " ; n --
 
 db " : char>dig " ; c -- u
-db      " dup 0c [ 0c ten + ] literal within if 0c - else "
+db      " dup zeroc [ zeroc ten + ] literal within if zeroc - else "
 db      " dup  ac [  ac twenty-six + ] literal within if  ac - ten + else "
 db      " dup uac [ uac twenty-six + ] literal within if uac - ten + else "
 db      " [ 0 1 - ] literal endif endif endif ; "

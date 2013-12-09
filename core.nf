@@ -50,6 +50,7 @@ dec
 : store-str ( addr u --) dup pad+ swap cmove ;
 | Converts string with a length to zero-terminated string
 : zero-str ( addr u -- addr) dup put-zero tuck store-str pad+ ;
+: forget ( "word" --) get-word find @ word-list ! ;
 
 : add-word ( au--) align
     here  word-list @ ,  word-list !

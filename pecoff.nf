@@ -54,7 +54,7 @@ variable ilts-length
 : image-align ( u --) image-pos @ aligned image-pos ! ;
 : r, ( u --) import-refs-here !  4 import-refs-length +! ;
 
-: rva ( addr -- u) section-base @ - section-rva + ;
+: rva ( addr -- u) dup 0 = if exit endif section-base @ - section-rva + ;
 : nrva ( addr -- u) import-names @ -  names-base @ +  rva ;
 
 : alloc-image ( --) 18000 alloc dup pecoff-mem !
@@ -158,8 +158,9 @@ variable ilts-length
 
 variable old-here
 : save-here ( --) here old-here ! ;
-: update-here ( --) image-here to here ;
 : restore-here ( --) old-here @ to here ;
+: update-here ( --) image-here to here ;
+: update-image-here ( --) here image @ - image-pos ! ;
 
 | Allocates memory structures for constructing PE/COFF file.
 : pecoff-init ( --) alloc-image section-file-pointer image-pos ! ;
@@ -169,8 +170,8 @@ variable old-here
 : set-length ( --) image-pos @ dup image-length !
     9 bits-aligned file-length ! ;
 | Writes PE/COFF image to file with specified filename.
-: pecoff-write ( addr u --) set-length 0 image-pos ! pe-header
-    open dup write sys-close restore-here ;
+: pecoff-write ( addr u --) update-image-here set-length 0 image-pos !
+    pe-header open dup write sys-close restore-here file-length @ .  ;
 
 | Frees memory structures allocated for PE/COFF image.
 : pecoff-done ( --) pecoff-mem @ free ;
@@ -240,7 +241,7 @@ variable ilt-addr
 : copy-names ( --) import-names @  names-base @  import-names-length @  cmove ;
 : update-image-pos ( --) names-base @ import-names-length @ +
     image @ -  image-pos ! ;
-: init-compiler ( --) save-here update-here ;
+: init-compiler ( --) " pecoff-compiler.nf" included save-here update-here ;
 : import-done ( --) calc-dt-length calc-ilts-length
     calc-section-base calc-names-base calc-ilts-base
     fill-image-imports copy-names update-image-pos

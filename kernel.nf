@@ -17,12 +17,12 @@
 
 | Common part for all code words.
 | Executes next word from thread.
-: next ( --)
+asm: next ( --)
     eax  [esi]      movd-reg-mem    | Get next word address from thread
     esi  4 [b+esi]  lead            | Adjust IP
     edi  [eax]      movd-reg-mem    | EDI points to machine code of next word
     edi             jmpd-near-reg   | Jump to word machine code
-    ;
+asm;
 
 | x1 x2 -- x2 x1
 create-code swap
@@ -279,21 +279,21 @@ here
     esi  8 [b+eax]  lead            | Set IP to the parameter field
                                     | of current word
     next
-constant do-enter
+rva constant do-enter
 
 | Code field for var
 here
     edx             pushd-reg       | Push old TOS
     edx  8 [b+eax]  lead            | Get adress of parameter field
     next
-constant do-var
+rva constant do-var
 
 | Code field for const
 here
     edx             pushd-reg       | Push old TOS
     edx  8 [b+eax]  movd-reg-mem    | Load TOS from parameter field
     next
-constant do-const
+rva constant do-const
 
 | Code field for does>
 here
@@ -304,6 +304,6 @@ here
     edx  8 [b+eax]  lead            | Set TOS to the parameter field
                                     | of current word
     next
-constant do-does
+rva constant do-does
 
 
