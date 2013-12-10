@@ -17,12 +17,12 @@
 
 | Common part for all code words.
 | Executes next word from thread.
-asm: next ( --)
+: next ( --)
     eax  [esi]      movd-reg-mem    | Get next word address from thread
     esi  4 [b+esi]  lead            | Adjust IP
     edi  [eax]      movd-reg-mem    | EDI points to machine code of next word
     edi             jmpd-near-reg   | Jump to word machine code
-asm;
+;
 
 | x1 x2 -- x2 x1
 create-code swap

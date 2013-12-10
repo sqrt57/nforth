@@ -241,9 +241,7 @@ variable ilt-addr
 : copy-names ( --) import-names @  names-base @  import-names-length @  cmove ;
 : update-image-pos ( --) names-base @ import-names-length @ +
     image @ -  image-pos ! ;
-: init-compiler ( --) " pecoff-compiler.nf" included save-here update-here ;
 : import-done ( --) calc-dt-length calc-ilts-length
     calc-section-base calc-names-base calc-ilts-base
-    fill-image-imports copy-names update-image-pos
-    init-compiler ;
+    fill-image-imports copy-names update-image-pos ;
 : set-code-entry ( addr --) rva entry-rva ! ;
