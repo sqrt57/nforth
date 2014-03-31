@@ -15,15 +15,6 @@
 | You should have received a copy of the GNU Affero General Public License
 | along with Nforth.  If not, see <http://www.gnu.org/licenses/>.
 
-| Common part for all code words.
-| Executes next word from thread.
-: next ( --)
-    eax  [esi]      movd-reg-mem    | Get next word address from thread
-    esi  4 [b+esi]  lead            | Adjust IP
-    edi  [eax]      movd-reg-mem    | EDI points to machine code of next word
-    edi             jmpd-near-reg   | Jump to word machine code
-;
-
 | x1 x2 -- x2 x1
 create-code swap
     edx  [esp]      xchgd-reg-mem
@@ -252,7 +243,7 @@ create-code /mod ( n1 n2 -- n3 n4)
 create-code u/mod ( u1 u2 -- u3 u4)
     ebx  edx        movd-reg-reg    | Store U2 in EBX
     eax             popd-reg        | Store U1 in EAX
-    edx edx         xord-reg-reg    | Zero-extend U1 to EDX:EAX
+    edx  edx        xord-reg-reg    | Zero-extend U1 to EDX:EAX
     ebx             divd-reg        | Unsigned divide U1 by U2
     edx             pushd-reg       | Store remainder as U3
     edx  eax        movd-reg-reg    | Store quotient as U4
@@ -272,38 +263,8 @@ create-code rshift ( x1 u -- x2)
     edx             shrd-reg-cl     | Perform left shift of TOS
     next
 
-| Code field for enter
-here
-    ebp  -4 [b+ebp] lead            | Add one cell on top of return stack
-    [ebp]  esi      movd-mem-reg    | Push IP on return stack
-    esi  8 [b+eax]  lead            | Set IP to the parameter field
-                                    | of current word
+| Exitting from a word
+create-code exit ( --)
+    esi  [ebp]      movd-reg-mem    | Pop IP from return stack
+    ebp  4 [b+ebp]  lead            | Remove cell from return stack
     next
-rva constant do-enter
-
-| Code field for var
-here
-    edx             pushd-reg       | Push old TOS
-    edx  8 [b+eax]  lead            | Get adress of parameter field
-    next
-rva constant do-var
-
-| Code field for const
-here
-    edx             pushd-reg       | Push old TOS
-    edx  8 [b+eax]  movd-reg-mem    | Load TOS from parameter field
-    next
-rva constant do-const
-
-| Code field for does>
-here
-    ebp  -4 [b+ebp] lead            | Add one cell on top of return stack
-    [ebp]  esi      movd-mem-reg    | Push IP on return stack
-    edx             pushd-reg       | Push one cell on parameter stack
-    esi  4 [b+eax]  movd-reg-mem    | Set IP to DOES> entry for current word
-    edx  8 [b+eax]  lead            | Set TOS to the parameter field
-                                    | of current word
-    next
-rva constant do-does
-
-

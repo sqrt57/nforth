@@ -171,7 +171,7 @@ variable old-here
     9 bits-aligned file-length ! ;
 | Writes PE/COFF image to file with specified filename.
 : pecoff-write ( addr u --) update-image-here set-length 0 image-pos !
-    pe-header open dup write sys-close restore-here file-length @ .  ;
+    pe-header open dup write sys-close restore-here ;
 
 | Frees memory structures allocated for PE/COFF image.
 : pecoff-done ( --) pecoff-mem @ free ;
@@ -245,3 +245,6 @@ variable ilt-addr
     calc-section-base calc-names-base calc-ilts-base
     fill-image-imports copy-names update-image-pos ;
 : set-code-entry ( addr --) rva entry-rva ! ;
+
+: before update-image-here restore-here ;
+: after save-here update-here ;

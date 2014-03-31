@@ -43,6 +43,7 @@ dec
 -1 constant true
 0 constant false
 
+| Aligns address so that specified number of address bits are zero
 : bits-aligned ( addr u -- addr) swap 1 - over rshift 1 + swap lshift ;
 
 : pad+ ( u -- u) pad + 1 + ;
